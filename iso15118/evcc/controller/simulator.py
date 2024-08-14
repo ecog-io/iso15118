@@ -538,7 +538,7 @@ class SimEVController(EVControllerInterface):
 
     async def continue_charging(self) -> bool:
         """Overrides EVControllerInterface.continue_charging()."""
-        if self.charging_loop_cycles == 0:
+        if self.charging_loop_cycles == 0 or self._charging_is_completed:
             # To simulate a bit of a charging loop, we'll let it run chargingLoopCycle
             # times specified in config file
             return False
