@@ -1123,6 +1123,13 @@ class PowerDelivery(StateSECC):
                             ResponseCode.FAILED_SCHEDULE_SELECTION_INVALID,
                         )
                         return
+                # According to section 8.5.6 in ISO 15118-20, the EV enters into HLC-C
+                # (High Level Controlled Charging) once
+                # PowerDeliveryRes(ResponseCode=OK) is sent with a ChargeProgress=Start
+                # To facilitate testing, we will set the HLC-C flag to True here
+                # but if the contactor wont close as expected, we set
+                # the HLC-C flag to False and stop the state machine immediately
+                await self.comm_session.evse_controller.set_hlc_charging(True)
 
                 # [V2G20-1617] The EVCC shall signal CP State B before sending the
                 # first PowerDeliveryReq with ChargeProgress equals "Start" within V2G
@@ -1131,26 +1138,19 @@ class PowerDelivery(StateSECC):
                 # ms after sending the first PowerDeliveryReq with ChargeProgress
                 # equals "Start" within V2G communication session.
                 if not await self.wait_for_state_c_or_d():
-                    self.stop_state_machine(
-                        "[V2G20-847]: State C/D not detected in PowerDelivery within"
-                        " the allotted 250 ms.",
-                        message,
-                        ResponseCode.FAILED,
+                    logger.warning(
+                        "[V2G20-847]: C2/D2 CP state not detected after "
+                        "250ms in PowerDelivery"
                     )
-                    return
 
                 if not await self.comm_session.evse_controller.is_contactor_closed():
+                    await self.comm_session.evse_controller.set_hlc_charging(False)
                     self.stop_state_machine(
                         "Contactor didn't close",
                         message,
                         ResponseCode.FAILED_CONTACTOR_ERROR,
                     )
                     return
-
-                # According to section 8.5.6 in ISO 15118-20, the EV enters into HLC-C
-                # (High Level Controlled Charging) once
-                # PowerDeliveryRes(ResponseCode=OK) is sent with a ChargeProgress=Start
-                await self.comm_session.evse_controller.set_hlc_charging(True)
 
                 if self.comm_session.selected_energy_service.service in (
                     ServiceV20.AC,
@@ -1348,12 +1348,12 @@ class ACChargeParameterDiscovery(StateSECC):
                 ac_params=params if energy_service == ServiceV20.AC else None,
                 bpt_ac_params=params if energy_service == ServiceV20.AC_BPT else None,
             )
-            # Update EV/EVSE Data Context
-            self.charge_parameter_valid(ac_cpd_req.ac_params)
-            ev_data_context = self.comm_session.evse_controller.ev_data_context
-            ev_data_context.update_ac_charge_parameters_v20(energy_service, ac_cpd_req)
+            # Update EVSE Data Context not needed as comes from cs config
             evse_data_context = self.comm_session.evse_controller.evse_data_context
             evse_data_context.current_type = CurrentType.AC
+            # Update EV Data Context
+            ev_data_context = self.comm_session.evse_controller.ev_data_context
+            ev_data_context.update_ac_charge_parameters_v20(energy_service, ac_cpd_req)
             await self.comm_session.evse_controller.send_rated_limits()
         except UnknownEnergyService:
             self.stop_state_machine(
@@ -1545,11 +1545,15 @@ class DCChargeParameterDiscovery(StateSECC):
                 dc_params=params if energy_service == ServiceV20.DC else None,
                 bpt_dc_params=params if energy_service == ServiceV20.DC_BPT else None,
             )
-            # Update EV/EVSE Data Context
-            ev_data_context = self.comm_session.evse_controller.ev_data_context
-            ev_data_context.update_dc_charge_parameters_v20(energy_service, dc_cpd_req)
+            # Update EVSE Data Context
             evse_data_context = self.comm_session.evse_controller.evse_data_context
             evse_data_context.current_type = CurrentType.DC
+            evse_data_context.update_dc_charge_parameters_v20(
+                energy_service, dc_cpd_res
+            )
+            # Update EV Data Context
+            ev_data_context = self.comm_session.evse_controller.ev_data_context
+            ev_data_context.update_dc_charge_parameters_v20(energy_service, dc_cpd_req)
             await self.comm_session.evse_controller.send_rated_limits()
         except UnknownEnergyService:
             self.stop_state_machine(

@@ -28,7 +28,7 @@ def test_derive_certificate_hash_data_root_certificate() -> None:
     assert hash_data == {
         "hash_algorithm": "SHA256",
         "issuer_name_hash": "nYwcUlDO5yz8nuq_z8h5WhCkhcQA5RCWds-otYxz92g=",
-        "issuer_key_hash": "sB_ugYa6EuIbiu8qiK8BueX2bB74WwFiUnPiaoRlK8k=",
+        "issuer_key_hash": "KfgNsGZgslkA3rN13dUJBS3C28nQ2kojZC6skEJQFPE=",
         "serial_number": "12353",
         "responder_url": "https://www.example.com/",
     }
@@ -54,8 +54,8 @@ def test_derive_certificate_hash_data_contract_certificate() -> None:
 
     assert hash_data == {
         "hash_algorithm": "SHA256",
-        "issuer_name_hash": "ZycWQ1dc_5ZgLYpfcQPBFfiSwfH925lgYXu_ZmpDuWg=",
-        "issuer_key_hash": "2t1s_HMWXEZ3XCHc62k7szeq2SgB1jEOeOMizgydw0c=",
+        "issuer_name_hash": "flWACDgRS0Xz0-Y9TJnZV37hnheh6DdDVJNAvhDVzfw=",
+        "issuer_key_hash": "XC6s3YLFxIhw03pUBTiOrdbfRR70lodzuZzZX61ZBGw=",
         "serial_number": "12356",
         "responder_url": "https://www.example.com/",
     }
@@ -69,7 +69,7 @@ def test_certificate_to_pem_string() -> None:
     # very informative, so we just check the PEM format and a small part of the string.
     # It's unlikely that any reasonable implementation of certificate_to_pem_string
     # will violate this.
-    assert pem_string.startswith("-----BEGIN CERTIFICATE-----\nMIICUTCCAfig")
+    assert pem_string.startswith("-----BEGIN CERTIFICATE-----\nMIICQTCCAeigAwI")
     assert "-----END CERTIFICATE-----" in pem_string
 
 
@@ -110,29 +110,29 @@ def test_get_certificate_hash_data():
     assert hash_data == [
         {
             "hash_algorithm": "SHA256",
-            "issuer_name_hash": "ZycWQ1dc_5ZgLYpfcQPBFfiSwfH925lgYXu_ZmpDuWg=",
-            "issuer_key_hash": "2t1s_HMWXEZ3XCHc62k7szeq2SgB1jEOeOMizgydw0c=",
+            "issuer_name_hash": "flWACDgRS0Xz0-Y9TJnZV37hnheh6DdDVJNAvhDVzfw=",
+            "issuer_key_hash": "XC6s3YLFxIhw03pUBTiOrdbfRR70lodzuZzZX61ZBGw=",
             "serial_number": "12356",
             "responder_url": "https://www.example.com/",
         },
         {
             "hash_algorithm": "SHA256",
-            "issuer_name_hash": "EmoLeXDvkq6gXNIj6788YfEhtuBM6JY-ftm44q3LZrs=",
-            "issuer_key_hash": "iwBpLgtEjxsmCqlluNckS4FJ30rAAJZgbv6bNmq6GSw=",
+            "issuer_name_hash": "S6zgGTKb8_bqtLv3vUbl0T43U6h6NvEzLtqOheLi4TI=",
+            "issuer_key_hash": "bIiJGxrUWuNNKq8HFfdip-w4S1COjU0SI3LlqA72K5s=",
             "serial_number": "12355",
             "responder_url": "https://www.example.com/",
         },
         {
             "hash_algorithm": "SHA256",
             "issuer_name_hash": "nYwcUlDO5yz8nuq_z8h5WhCkhcQA5RCWds-otYxz92g=",
-            "issuer_key_hash": "sB_ugYa6EuIbiu8qiK8BueX2bB74WwFiUnPiaoRlK8k=",
+            "issuer_key_hash": "KfgNsGZgslkA3rN13dUJBS3C28nQ2kojZC6skEJQFPE=",
             "serial_number": "12354",
             "responder_url": "https://www.example.com/",
         },
         {
             "hash_algorithm": "SHA256",
             "issuer_name_hash": "nYwcUlDO5yz8nuq_z8h5WhCkhcQA5RCWds-otYxz92g=",
-            "issuer_key_hash": "sB_ugYa6EuIbiu8qiK8BueX2bB74WwFiUnPiaoRlK8k=",
+            "issuer_key_hash": "KfgNsGZgslkA3rN13dUJBS3C28nQ2kojZC6skEJQFPE=",
             "serial_number": "12353",
             "responder_url": "https://www.example.com/",
         },

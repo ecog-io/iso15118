@@ -32,7 +32,10 @@ from iso15118.shared.messages.iso15118_20.common_messages import (
 from iso15118.shared.messages.iso15118_20.common_messages import (
     SessionSetupRes as SessionSetupResV20,
 )
-from iso15118.shared.messages.iso15118_20.common_types import MessageHeader, Processing
+from iso15118.shared.messages.iso15118_20.common_types import (
+    MessageHeader,
+    Processing,
+)
 from iso15118.shared.messages.iso15118_20.common_types import (
     V2GMessage as V2GMessageV20,
 )

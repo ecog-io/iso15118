@@ -27,7 +27,9 @@ from iso15118.shared.messages.iso15118_2.body import BodyBase as BodyBaseV2
 from iso15118.shared.messages.iso15118_2.body import (
     SessionSetupReq as SessionSetupReqV2,
 )
-from iso15118.shared.messages.iso15118_2.body import get_msg_type
+from iso15118.shared.messages.iso15118_2.body import (
+    get_msg_type,
+)
 from iso15118.shared.messages.iso15118_2.datatypes import ResponseCode as ResponseCodeV2
 from iso15118.shared.messages.iso15118_2.msgdef import V2GMessage as V2GMessageV2
 from iso15118.shared.messages.iso15118_20.common_messages import (

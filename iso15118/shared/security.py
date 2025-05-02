@@ -67,7 +67,9 @@ from iso15118.shared.messages.iso15118_2.datatypes import (
 from iso15118.shared.messages.iso15118_20.common_messages import (
     CertificateChain as CertificateChainV20,
 )
-from iso15118.shared.messages.iso15118_20.common_messages import SignedCertificateChain
+from iso15118.shared.messages.iso15118_20.common_messages import (
+    SignedCertificateChain,
+)
 from iso15118.shared.messages.iso15118_20.common_messages import (
     SubCertificates as SubCertificatesV20,
 )
@@ -1532,7 +1534,7 @@ class CertPath(str, Enum):
 
     def __get__(self, instance, owner):
         return os.path.join(
-            shared_settings[SettingKey.PKI_PATH], "iso15118_2/certs/", self.value
+            str(shared_settings[SettingKey.PKI_PATH]), "iso15118_2/certs/", self.value
         )
 
 
@@ -1571,7 +1573,7 @@ class KeyPath(str, Enum):
 
     def __get__(self, instance, owner):
         return os.path.join(
-            shared_settings[SettingKey.PKI_PATH],
+            str(shared_settings[SettingKey.PKI_PATH]),
             "iso15118_2/private_keys/",
             self.value,
         )
@@ -1594,7 +1596,7 @@ class KeyPasswordPath(str, Enum):
 
     def __get__(self, instance, owner):
         return os.path.join(
-            shared_settings[SettingKey.PKI_PATH],
+            str(shared_settings[SettingKey.PKI_PATH]),
             "iso15118_2/private_keys/",
             self.value,
         )

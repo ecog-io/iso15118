@@ -1039,7 +1039,7 @@ class TestEvScenarios:
             ),
             (
                 ControlMode.DYNAMIC,
-                Terminate,
+                ACChargeLoop,
                 SelectedEnergyService(
                     service=ServiceV20.AC, is_free=True, parameter_set=None
                 ),

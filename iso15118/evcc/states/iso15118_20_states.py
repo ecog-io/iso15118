@@ -4,6 +4,7 @@ V2GMessage objects of the ISO 15118-20 protocol, from SessionSetupRes to
 SessionStopRes.
 """
 
+import asyncio
 import logging
 import time
 from typing import Any, List, Union, cast
@@ -69,7 +70,9 @@ from iso15118.shared.messages.iso15118_20.common_types import (
 from iso15118.shared.messages.iso15118_20.common_types import (
     V2GMessage as V2GMessageV20,
 )
-from iso15118.shared.messages.iso15118_20.common_types import V2GRequest
+from iso15118.shared.messages.iso15118_20.common_types import (
+    V2GRequest,
+)
 from iso15118.shared.messages.iso15118_20.dc import (
     BPTDynamicDCChargeLoopReqParams,
     BPTScheduledDCChargeLoopReqParams,
@@ -1300,6 +1303,14 @@ class ACChargeLoop(StateEVCC):
             )
 
         elif await self.comm_session.ev_controller.continue_charging():
+            try:
+                delay: int = (
+                    await self.comm_session.ev_controller.charge_loop_delay()
+                )  # noqa
+                logger.info(f"Next ChargeLoop Req in {delay} seconds")
+                await asyncio.sleep(delay)
+            except Exception as e:
+                logger.info(f"No delay for the next ChargeLoop Req. Reason {e}")
             scheduled_params, dynamic_params = None, None
             bpt_scheduled_params, bpt_dynamic_params = None, None
             selected_energy_service = self.comm_session.selected_energy_service
@@ -1675,6 +1686,14 @@ class DCChargeLoop(StateEVCC):
             )
 
         elif await self.comm_session.ev_controller.continue_charging():
+            try:
+                delay: int = (
+                    await self.comm_session.ev_controller.charge_loop_delay()
+                )  # noqa
+                logger.info(f"Next ChargeLoop Req in {delay} seconds")
+                await asyncio.sleep(delay)
+            except Exception as e:
+                logger.info(f"No delay for the next ChargeLoop Req. Reason {e}")
             current_demand_req = await self.build_current_demand_data()
 
             self.create_next_message(

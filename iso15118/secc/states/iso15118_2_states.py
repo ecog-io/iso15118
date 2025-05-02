@@ -1369,6 +1369,7 @@ class ChargeParameterDiscovery(StateSECC):
                 await self.comm_session.evse_controller.get_ac_charge_params_v2()
             )
             evse_data_context.current_type = CurrentType.AC
+            # Update EV data context with the DC charge parameters
             ev_data_context.update_ac_charge_parameters_v2(
                 charge_params_req.ac_ev_charge_parameter
             )
@@ -1377,6 +1378,7 @@ class ChargeParameterDiscovery(StateSECC):
                 await self.comm_session.evse_controller.get_dc_charge_parameters_v2()
             )
             evse_data_context.current_type = CurrentType.DC
+            # Update EV data context with the DC charge parameters
             ev_data_context.update_dc_charge_parameters(
                 charge_params_req.dc_ev_charge_parameter
             )

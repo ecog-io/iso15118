@@ -1,15 +1,12 @@
+import logging
 from dataclasses import dataclass
 from enum import Enum
 from typing import Optional, Union
 
 from iso15118.secc.controller.common import Limits, UnknownEnergyService
-from iso15118.shared.messages.datatypes import DCEVSEChargeParameter
-from iso15118.shared.messages.enums import ControlMode, ServiceV20
-from iso15118.shared.messages.iso15118_2.datatypes import ACEVSEChargeParameter
-from iso15118.shared.messages.iso15118_20.ac import (
-    ACChargeParameterDiscoveryRes,
-    ACChargeParameterDiscoveryResParams,
-    BPTACChargeParameterDiscoveryResParams,
+from iso15118.shared.messages.enums import (
+    ControlMode,
+    ServiceV20,
 )
 from iso15118.shared.messages.iso15118_20.common_messages import ScheduleExchangeRes
 from iso15118.shared.messages.iso15118_20.dc import (
@@ -17,6 +14,8 @@ from iso15118.shared.messages.iso15118_20.dc import (
     DCChargeParameterDiscoveryRes,
     DCChargeParameterDiscoveryResParams,
 )
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -44,6 +43,11 @@ class EVSEACCPDLimits(Limits):
     min_discharge_power_l2: Optional[float] = None  # Optional
     min_discharge_power_l3: Optional[float] = None  # Optional
 
+    def update_from_dict(self, values: dict) -> None:
+        for key, value in values.items():
+            if key in self.__dataclass_fields__:
+                setattr(self, key, value)
+
 
 @dataclass
 class EVSEDCCPDLimits(Limits):
@@ -63,6 +67,11 @@ class EVSEDCCPDLimits(Limits):
     min_discharge_power: Optional[float] = None
     max_discharge_current: Optional[float] = None
     min_discharge_current: Optional[float] = None
+
+    def update_from_dict(self, values: dict) -> None:
+        for key, value in values.items():
+            if key in self.__dataclass_fields__:
+                setattr(self, key, value)
 
 
 @dataclass
@@ -86,8 +95,13 @@ class EVSEACCLLimits(Limits):
     max_discharge_power_l2: Optional[float] = None
     max_discharge_power_l3: Optional[float] = None
     max_discharge_reactive_power: Optional[float] = None
-    max_discharge_active_power_l2: Optional[float] = None
-    max_discharge_active_power_l3: Optional[float] = None
+    max_discharge_reactive_power_l2: Optional[float] = None
+    max_discharge_reactive_power_l3: Optional[float] = None
+
+    def update_from_dict(self, values: dict) -> None:
+        for key, value in values.items():
+            if key in self.__dataclass_fields__:
+                setattr(self, key, value)
 
 
 @dataclass
@@ -102,6 +116,11 @@ class EVSEDCCLLimits(Limits):
     max_discharge_power: Optional[float] = None  # Req in 15118-20 Dynamic BPT CL
     min_discharge_power: Optional[float] = None  # Req in 15118-20 Dynamic BPT CL
     max_discharge_current: Optional[float] = None  # Req in 15118-20 Dynamic BPT CL
+
+    def update_from_dict(self, values: dict) -> None:
+        for key, value in values.items():
+            if key in self.__dataclass_fields__:
+                setattr(self, key, value)
 
 
 @dataclass
@@ -199,7 +218,6 @@ class EVSEDataContext:
     # gets access to the session limits
     # and updates them accordingly. The limits are then naturally
     # passed to the EV/EVSE during the Charging Loop.
-
     def update_schedule_exchange_parameters(
         self, control_mode: ControlMode, schedule_exchange_res: ScheduleExchangeRes
     ):
@@ -213,202 +231,6 @@ class EVSEDataContext:
             if se_params.min_soc:
                 self.min_soc = se_params.min_soc
 
-    def update_ac_charge_parameters_v2(
-        self, ac_charge_parameter: ACEVSEChargeParameter
-    ) -> None:
-        """Update the EVSE data context with the AC charge parameters."""
-        self.current_type = CurrentType.AC
-        if self.rated_limits.ac_limits is None:
-            self.rated_limits.ac_limits = EVSEACCPDLimits()
-        rated_limits = self.rated_limits.ac_limits
-        if self.session_limits.ac_limits is None:
-            self.session_limits.ac_limits = EVSEACCLLimits()
-        session_limits = self.session_limits.ac_limits
-        self.nominal_voltage = (
-            ac_charge_parameter.evse_nominal_voltage.get_decimal_value()
-        )  # noqa: E501
-        rated_limits.max_current = (
-            ac_charge_parameter.evse_max_current.get_decimal_value()
-        )
-
-        rated_limits.max_charge_power = rated_limits.max_current * self.nominal_voltage
-        rated_limits.max_charge_power_l2 = rated_limits.max_charge_power
-        rated_limits.max_charge_power_l3 = rated_limits.max_charge_power
-        rated_limits.max_discharge_power = 0
-        rated_limits.min_charge_power = 0
-        rated_limits.min_discharge_power = 0
-        # Create the session limits based on the rated limits
-        # without exceeding the rated limits
-        for value in vars(rated_limits):
-            if hasattr(session_limits, value):
-                rated_value = getattr(rated_limits, value)
-                session_value = getattr(session_limits, value)
-                try:
-                    if not session_value or (session_value > rated_value):
-                        setattr(session_limits, value, rated_value)
-                except TypeError:
-                    pass
-
-    def update_dc_charge_parameters(
-        self, dc_charge_parameter: DCEVSEChargeParameter
-    ) -> None:
-        """Update the EVSE data context with the DC charge parameters."""
-        self.current_type = CurrentType.DC
-        if not self.rated_limits.dc_limits:
-            self.rated_limits.dc_limits = EVSEDCCPDLimits()
-        rated_limits = self.rated_limits.dc_limits
-        if not self.session_limits.dc_limits:
-            self.session_limits.dc_limits = EVSEDCCLLimits()
-        rated_limits.max_charge_power = (
-            dc_charge_parameter.evse_maximum_power_limit.get_decimal_value()
-        )
-        rated_limits.max_charge_current = (
-            dc_charge_parameter.evse_maximum_current_limit.get_decimal_value()
-        )
-        rated_limits.min_charge_current = (
-            dc_charge_parameter.evse_minimum_current_limit.get_decimal_value()
-        )
-        rated_limits.max_voltage = (
-            dc_charge_parameter.evse_maximum_voltage_limit.get_decimal_value()
-        )
-        rated_limits.min_voltage = (
-            dc_charge_parameter.evse_minimum_voltage_limit.get_decimal_value()
-        )
-
-        self.peak_current_ripple = (
-            dc_charge_parameter.evse_peak_current_ripple.get_decimal_value()
-        )
-        if dc_charge_parameter.evse_current_regulation_tolerance:
-            self.current_regulation_tolerance = (
-                dc_charge_parameter.evse_current_regulation_tolerance.get_decimal_value()  # noqa: E501
-            )
-        if dc_charge_parameter.evse_energy_to_be_delivered:
-            self.energy_to_be_delivered = (
-                dc_charge_parameter.evse_energy_to_be_delivered.get_decimal_value()
-            )
-            # Create the session limits based on the rated limits
-            # without exceeding the rated limits
-            for value in vars(rated_limits):
-                if hasattr(self.session_limits.dc_limits, value):
-                    rated_value = getattr(rated_limits, value)
-                    session_value = getattr(self.session_limits.dc_limits, value)
-                    try:
-                        if not session_value or (session_value > rated_value):
-                            setattr(self.session_limits.dc_limits, value, rated_value)
-                    except TypeError:
-                        pass
-
-    def update_ac_charge_parameters_v20(
-        self,
-        energy_service: ServiceV20,
-        charge_parameter: ACChargeParameterDiscoveryRes,
-    ) -> None:
-        """Update the EVSE data context with the
-        ACChargeParameterDiscoveryRes parameters"""
-        self.current_type = CurrentType.AC
-        ac_rated_limits = self.rated_limits.ac_limits = EVSEACCPDLimits()
-        self.session_limits = EVSESessionLimits()
-        self.session_limits.ac_limits = EVSEACCLLimits()
-        params: Union[
-            ACChargeParameterDiscoveryResParams, BPTACChargeParameterDiscoveryResParams
-        ] = None
-        if energy_service == ServiceV20.AC:
-            params = charge_parameter.ac_params
-            self._update_common_ac_charge_parameters_v20(ac_rated_limits, params)
-        elif energy_service == ServiceV20.AC_BPT:
-            params = charge_parameter.bpt_ac_params
-            self._update_acbpt_charge_parameters_v20(ac_rated_limits, params)
-        else:
-            raise UnknownEnergyService(f"Unknown Service {energy_service}")
-        # Create the session limits based on the rated limits
-        self.session_limits.dc_limits.update(ac_rated_limits.as_dict())
-
-    def _update_common_ac_charge_parameters_v20(
-        self,
-        ac_rated_limits: EVSEACCPDLimits,
-        params: Union[
-            ACChargeParameterDiscoveryResParams, BPTACChargeParameterDiscoveryResParams
-        ],
-    ) -> None:
-        """Update the EVSE data context with the common
-        ACChargeParameterDiscoveryRes parameters"""
-        ac_rated_limits.max_charge_power = (
-            params.evse_max_charge_power.get_decimal_value()
-        )  # noqa: E501
-        if params.evse_max_charge_power_l2:
-            ac_rated_limits.max_charge_power_l2 = (
-                params.evse_max_charge_power_l2.get_decimal_value()
-            )  # noqa: E501
-        if params.evse_max_charge_power_l3:
-            ac_rated_limits.max_charge_power_l3 = (
-                params.evse_max_charge_power_l3.get_decimal_value()
-            )
-        ac_rated_limits.min_charge_power = (
-            params.evse_min_charge_power.get_decimal_value()
-        )  # noqa: E501
-        if params.evse_min_charge_power_l2:
-            ac_rated_limits.min_charge_power_l2 = (
-                params.evse_min_charge_power_l2.get_decimal_value()
-            )  # noqa: E501
-        if params.evse_min_charge_power_l3:
-            ac_rated_limits.min_charge_power_l3 = (
-                params.evse_min_charge_power_l3.get_decimal_value()
-            )  # noqa: E501
-        self.nominal_frequency = (
-            params.evse_nominal_frequency.get_decimal_value()
-        )  # noqa: E501
-        if params.max_power_asymmetry:
-            self.max_power_asymmetry = (
-                params.max_power_asymmetry.get_decimal_value()
-            )  # noqa: E501
-        if params.evse_power_ramp_limit:
-            self.power_ramp_limit = (
-                params.evse_power_ramp_limit.get_decimal_value()
-            )  # noqa: E501
-        if params.evse_present_active_power:
-            self.present_active_power = (
-                params.evse_present_active_power.get_decimal_value()
-            )  # noqa: E501
-        if params.evse_present_active_power_l2:
-            self.present_active_power_l2 = (
-                params.evse_present_active_power_l2.get_decimal_value()
-            )  # noqa: E501
-        if params.evse_present_active_power_l3:
-            self.present_active_power_l3 = (
-                params.evse_present_active_power_l3.get_decimal_value()
-            )  # noqa: E501
-
-    def _update_acbpt_charge_parameters_v20(
-        self,
-        ac_rated_limits: EVSEACCPDLimits,
-        params: BPTACChargeParameterDiscoveryResParams,
-    ) -> None:
-        """Update the EVSE data context with the
-        BPTACChargeParameterDiscoveryRes parameters"""
-        self._update_common_ac_charge_parameters_v20(ac_rated_limits, params)
-        ac_rated_limits.max_discharge_power = (
-            params.evse_max_discharge_power.get_decimal_value()
-        )  # noqa: E501
-        if params.evse_max_discharge_power_l2:
-            ac_rated_limits.max_discharge_power_l2 = (
-                params.evse_max_discharge_power_l2.get_decimal_value()
-            )  # noqa: E501
-        if params.evse_max_discharge_power_l3:
-            ac_rated_limits.max_discharge_power_l3 = (
-                params.evse_max_discharge_power_l3.get_decimal_value()
-            )  # noqa: E501
-        ac_rated_limits.min_discharge_power = (
-            params.evse_min_discharge_power.get_decimal_value()
-        )  # noqa: E501
-        if params.evse_min_discharge_power_l2:
-            ac_rated_limits.min_discharge_power_l2 = (
-                params.evse_min_discharge_power_l2.get_decimal_value()
-            )  # noqa: E501
-        if params.evse_min_discharge_power_l3:
-            ac_rated_limits.min_discharge_power_l3 = (
-                params.evse_min_discharge_power_l3.get_decimal_value()
-            )  # noqa: E501
-
     def update_dc_charge_parameters_v20(
         self,
         energy_service: ServiceV20,
@@ -416,6 +238,12 @@ class EVSEDataContext:
     ) -> None:
         """Update the EVSE data context with the
         DCChargeParameterDiscoveryRes parameters"""
+        logger.debug(
+            "Updating EVSE Data Context (Rated and Session Limits) with "
+            "ChargeParameterDiscoveryResponse"
+        )
+        logger.debug(f"Active Rated Limits {self.rated_limits.dc_limits}")
+        logger.debug(f"Active Session Limits {self.session_limits.dc_limits}")
         self.current_type = CurrentType.DC
         dc_rated_limits = self.rated_limits.dc_limits = EVSEDCCPDLimits()
         self.session_limits = EVSESessionLimits()
@@ -433,6 +261,11 @@ class EVSEDataContext:
             raise UnknownEnergyService(f"Unknown Service {energy_service}")
         # Create the session limits based on the rated limits
         self.session_limits.dc_limits.update(dc_rated_limits.as_dict())
+        logger.debug(
+            "Rated and Session Limits updated after " "ChargeParametersDiscovery"
+        )
+        logger.debug(f"New Rated Limits {self.rated_limits.dc_limits}")
+        logger.debug(f"New Session Limits {self.session_limits.dc_limits}")
 
     def _update_common_dc_charge_parameters_v20(
         self,

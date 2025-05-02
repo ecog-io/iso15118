@@ -42,7 +42,9 @@ from iso15118.shared.messages.enums import (
 from iso15118.shared.messages.iso15118_2.datatypes import (
     ChargingSession as ChargingSessionV2,
 )
-from iso15118.shared.messages.iso15118_20.common_messages import AuthorizationReq
+from iso15118.shared.messages.iso15118_20.common_messages import (
+    AuthorizationReq,
+)
 from iso15118.shared.messages.iso15118_20.common_messages import (
     ChargingSession as ChargingSessionV20,
 )

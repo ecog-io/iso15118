@@ -134,9 +134,13 @@ from iso15118.shared.messages.iso15118_20.common_messages import (
     TaxRule,
     TaxRuleList,
 )
-from iso15118.shared.messages.iso15118_20.common_types import EVSEStatus
+from iso15118.shared.messages.iso15118_20.common_types import (
+    EVSEStatus,
+)
 from iso15118.shared.messages.iso15118_20.common_types import MeterInfo as MeterInfoV20
-from iso15118.shared.messages.iso15118_20.common_types import RationalNumber
+from iso15118.shared.messages.iso15118_20.common_types import (
+    RationalNumber,
+)
 from iso15118.shared.messages.iso15118_20.common_types import (
     ResponseCode as ResponseCodeV20,
 )
@@ -201,8 +205,8 @@ def get_evse_context():
         max_discharge_power_l2=10,
         max_discharge_power_l3=10,
         max_discharge_reactive_power=10,
-        max_discharge_active_power_l2=10,
-        max_discharge_active_power_l3=10,
+        max_discharge_reactive_power_l2=10,
+        max_discharge_reactive_power_l3=10,
     )
     dc_cl_limits = EVSEDCCLLimits(
         # Optional in 15118-20 DC CL (Scheduled)

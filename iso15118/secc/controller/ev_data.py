@@ -429,7 +429,7 @@ class EVDataContext:
         else:
             raise UnknownEnergyService(f"Unknown Service {energy_service}")
         # Create the session limits based on the rated limits
-        self.session_limits.dc_limits.update(ac_rated_limits.as_dict())
+        self.session_limits.ac_limits.update(ac_rated_limits.as_dict())
 
     def _update_common_ac_charge_parameters_v20(
         self,

@@ -71,6 +71,8 @@ class EVCCConfig(BaseModel):
 
     # charge cycle count
     charge_loop_cycle: Optional[int] = Field(10, alias="chargeLoopCycle")
+    # charge loop cycle delay before next cycle
+    charge_loop_delay_time: Optional[int] = Field(0, alias="chargeLoopDelay")
 
     def load_raw_values(self):
         # conversion of list of strings to enum types.

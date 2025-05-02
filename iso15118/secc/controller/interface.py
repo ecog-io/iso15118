@@ -46,7 +46,9 @@ from iso15118.shared.messages.iso15118_2.datatypes import (
 )
 from iso15118.shared.messages.iso15118_2.datatypes import MeterInfo as MeterInfoV2
 from iso15118.shared.messages.iso15118_2.datatypes import ResponseCode as ResponseCodeV2
-from iso15118.shared.messages.iso15118_2.datatypes import SAScheduleTuple
+from iso15118.shared.messages.iso15118_2.datatypes import (
+    SAScheduleTuple,
+)
 from iso15118.shared.messages.iso15118_20.ac import (
     ACChargeParameterDiscoveryResParams,
     BPTACChargeParameterDiscoveryResParams,
@@ -64,9 +66,13 @@ from iso15118.shared.messages.iso15118_20.common_messages import (
     ServiceList,
     ServiceParameterList,
 )
-from iso15118.shared.messages.iso15118_20.common_types import EVSEStatus
+from iso15118.shared.messages.iso15118_20.common_types import (
+    EVSEStatus,
+)
 from iso15118.shared.messages.iso15118_20.common_types import MeterInfo as MeterInfoV20
-from iso15118.shared.messages.iso15118_20.common_types import RationalNumber
+from iso15118.shared.messages.iso15118_20.common_types import (
+    RationalNumber,
+)
 from iso15118.shared.messages.iso15118_20.common_types import (
     ResponseCode as ResponseCodeV20,
 )
@@ -506,65 +512,160 @@ class EVSEControllerInterface(ABC):
         Relevant for:
         - ISO 15118-20
         """
-        """Get AC CL parameters 15118-20."""
         evse_session_limits = self.evse_data_context.session_limits.ac_limits
-        # TODO: read the rated limits
-        # Active Power
-        target_active_power = evse_session_limits.max_charge_power
-        target_active_power_l2 = None
-        target_active_power_l3 = None
-        target_reactive_power = None
-        target_reactive_power_l2 = None
-        target_reactive_power_l3 = None
-        target_active_power_value = RationalNumber.get_rational_repr(
-            target_active_power
-        )
-        if evse_session_limits.max_charge_power_l2:
-            target_active_power_l2 = evse_session_limits.max_charge_power_l2
-            target_active_power_l2 = RationalNumber.get_rational_repr(
-                target_active_power_l2
-            )  # noqa
-        if evse_session_limits.max_charge_power_l3:
-            target_active_power_l3 = evse_session_limits.max_charge_power_l3
-            target_active_power_l3 = RationalNumber.get_rational_repr(
-                target_active_power_l3
-            )  # noqa
-        # Reactive Power
-        if evse_session_limits.max_charge_reactive_power:
-            target_reactive_power = evse_session_limits.max_charge_reactive_power
+
+        def get_target_power_limits():
+            active_discharge_mode = False
+            reactive_discharge_mode = False
+
+            if (evse_session_limits.max_charge_power or 0) > 0 and (
+                evse_session_limits.max_discharge_power or 0
+            ) > 0:
+                logger.error(
+                    "Both Max Charge and Discharge power are set, "
+                    "Just one is allowed at a time. Ignoring Discharge setpoint."
+                )
+                target_active_power = evse_session_limits.max_charge_power
+            elif evse_session_limits.max_charge_power > 0:
+                target_active_power = evse_session_limits.max_charge_power
+            elif evse_session_limits.max_discharge_power > 0:
+                active_discharge_mode = True
+                target_active_power = (-1) * evse_session_limits.max_discharge_power
+            else:
+                logger.warning("No Active Power setpoint is provided. Setting to 0.")
+                target_active_power = 0
+
+            if (evse_session_limits.max_charge_reactive_power or 0) > 0 and (
+                evse_session_limits.max_discharge_reactive_power or 0
+            ) > 0:
+                logger.error(
+                    "Both Max Reactive Charge and Discharge power are set, "
+                    "Just one is allowed at a time. "
+                    "Ignoring Reactive Discharge setpoint."
+                )
+                target_reactive_power = evse_session_limits.max_charge_reactive_power
+            elif evse_session_limits.max_charge_reactive_power or 0 > 0:
+                target_reactive_power = evse_session_limits.max_charge_reactive_power
+            elif evse_session_limits.max_discharge_reactive_power or 0 > 0:
+                reactive_discharge_mode = True
+                target_reactive_power = (
+                    -1
+                ) * evse_session_limits.max_discharge_reactive_power
+            else:
+                logger.warning("No Reactive Power setpoint is provided. Setting to 0.")
+                target_reactive_power = 0
+
+            # Conversion to RationalNumber
+            target_active_power = RationalNumber.get_rational_repr(target_active_power)
             target_reactive_power = RationalNumber.get_rational_repr(
                 target_reactive_power
-            )  # noqa
-        if evse_session_limits.max_charge_reactive_power_l2:
-            target_reactive_power_l2 = evse_session_limits.max_charge_reactive_power_l2
-            target_reactive_power_l2 = RationalNumber.get_rational_repr(
-                target_reactive_power_l2
             )
-        if evse_session_limits.max_charge_reactive_power_l3:
-            target_reactive_power_l3 = evse_session_limits.max_charge_reactive_power_l3
-            target_reactive_power_l3 = RationalNumber.get_rational_repr(
-                target_reactive_power_l3
+            return (
+                target_active_power,
+                active_discharge_mode,
+                target_reactive_power,
+                reactive_discharge_mode,
             )
-        # Present Power
-        present_active_power = self.evse_data_context.present_active_power
+
+        def get_phase_power_limits(active_discharge_mode, reactive_discharge_mode):
+            target_active_power_l2 = target_active_power_l3 = None
+            target_reactive_power_l2 = target_reactive_power_l3 = None
+
+            if active_discharge_mode:
+                if evse_session_limits.max_discharge_power_l2:
+                    target_active_power_l2 = (
+                        -1
+                    ) * evse_session_limits.max_discharge_power_l2
+                    target_active_power_l2 = RationalNumber.get_rational_repr(
+                        target_active_power_l2
+                    )
+                if evse_session_limits.max_discharge_power_l3:
+                    target_active_power_l3 = (
+                        -1
+                    ) * evse_session_limits.max_discharge_power_l3
+                    target_active_power_l3 = RationalNumber.get_rational_repr(
+                        target_active_power_l3
+                    )
+            else:
+                if evse_session_limits.max_charge_power_l2:
+                    target_active_power_l2 = evse_session_limits.max_charge_power_l2
+                    target_active_power_l2 = RationalNumber.get_rational_repr(
+                        target_active_power_l2
+                    )
+                if evse_session_limits.max_charge_power_l3:
+                    target_active_power_l3 = evse_session_limits.max_charge_power_l3
+                    target_active_power_l3 = RationalNumber.get_rational_repr(
+                        target_active_power_l3
+                    )
+
+            if reactive_discharge_mode:
+                if evse_session_limits.max_discharge_reactive_power_l2:
+                    target_reactive_power_l2 = (
+                        -1
+                    ) * evse_session_limits.max_discharge_reactive_power_l2
+                    target_reactive_power_l2 = RationalNumber.get_rational_repr(
+                        target_reactive_power_l2
+                    )
+                if evse_session_limits.max_discharge_reactive_power_l3:
+                    target_reactive_power_l3 = (
+                        -1
+                    ) * evse_session_limits.max_discharge_reactive_power_l3
+                    target_reactive_power_l3 = RationalNumber.get_rational_repr(
+                        target_reactive_power_l3
+                    )
+            else:
+                if evse_session_limits.max_charge_reactive_power_l2:
+                    target_reactive_power_l2 = (
+                        evse_session_limits.max_charge_reactive_power_l2
+                    )
+                    target_reactive_power_l2 = RationalNumber.get_rational_repr(
+                        target_reactive_power_l2
+                    )
+                if evse_session_limits.max_charge_reactive_power_l3:
+                    target_reactive_power_l3 = (
+                        evse_session_limits.max_charge_reactive_power_l3
+                    )
+                    target_reactive_power_l3 = RationalNumber.get_rational_repr(
+                        target_reactive_power_l3
+                    )
+
+            return (
+                target_active_power_l2,
+                target_active_power_l3,
+                target_reactive_power_l2,
+                target_reactive_power_l3,
+            )
+
+        # Targets derivation based on the session limits
+        (
+            target_active_power,
+            active_discharge_mode,
+            target_reactive_power,
+            reactive_discharge_mode,
+        ) = get_target_power_limits()
+        (
+            target_active_power_l2,
+            target_active_power_l3,
+            target_reactive_power_l2,
+            target_reactive_power_l3,
+        ) = get_phase_power_limits(active_discharge_mode, reactive_discharge_mode)
+
         present_active_power = RationalNumber.get_rational_repr(
-            present_active_power
-        )  # noqa
-        present_active_power_l2 = self.evse_data_context.present_active_power_l2
+            self.evse_data_context.present_active_power
+        )
         present_active_power_l2 = RationalNumber.get_rational_repr(
-            present_active_power_l2
-        )  # noqa
-        present_active_power_l3 = self.evse_data_context.present_active_power_l3
+            self.evse_data_context.present_active_power_l2
+        )
         present_active_power_l3 = RationalNumber.get_rational_repr(
-            present_active_power_l3
-        )  # noqa
+            self.evse_data_context.present_active_power_l3
+        )
+
         if (
             control_mode == ControlMode.DYNAMIC
             and selected_service == ServiceV20.AC_BPT
         ):
-            # BPT Dynamic Message
-            bpt_dynamic_params = BPTDynamicACChargeLoopResParams(
-                evse_target_active_power=target_active_power_value,
+            return BPTDynamicACChargeLoopResParams(
+                evse_target_active_power=target_active_power,
                 evse_target_active_power_l2=target_active_power_l2,
                 evse_target_active_power_l3=target_active_power_l3,
                 evse_target_reactive_power=target_reactive_power,
@@ -574,13 +675,12 @@ class EVSEControllerInterface(ABC):
                 evse_present_active_power_l2=present_active_power_l2,
                 evse_present_active_power_l3=present_active_power_l3,
             )
-            return bpt_dynamic_params
         elif (
             control_mode == ControlMode.SCHEDULED
             and selected_service == ServiceV20.AC_BPT
         ):
-            bpt_scheduled_params = BPTScheduledACChargeLoopResParams(
-                evse_target_active_power=target_active_power_value,
+            return BPTScheduledACChargeLoopResParams(
+                evse_target_active_power=target_active_power,
                 evse_target_active_power_l2=target_active_power_l2,
                 evse_target_active_power_l3=target_active_power_l3,
                 evse_target_reactive_power=target_reactive_power,
@@ -590,10 +690,9 @@ class EVSEControllerInterface(ABC):
                 evse_present_active_power_l2=present_active_power_l2,
                 evse_present_active_power_l3=present_active_power_l3,
             )
-            return bpt_scheduled_params
         elif control_mode == ControlMode.DYNAMIC and selected_service == ServiceV20.AC:
-            dynamic_params = DynamicACChargeLoopResParams(
-                evse_target_active_power=target_active_power_value,
+            return DynamicACChargeLoopResParams(
+                evse_target_active_power=target_active_power,
                 evse_target_active_power_l2=target_active_power_l2,
                 evse_target_active_power_l3=target_active_power_l3,
                 evse_target_reactive_power=target_reactive_power,
@@ -603,10 +702,9 @@ class EVSEControllerInterface(ABC):
                 evse_present_active_power_l2=present_active_power_l2,
                 evse_present_active_power_l3=present_active_power_l3,
             )
-            return dynamic_params
         else:
-            scheduled_params = ScheduledACChargeLoopResParams(
-                evse_target_active_power=target_active_power_value,
+            return ScheduledACChargeLoopResParams(
+                evse_target_active_power=target_active_power,
                 evse_target_active_power_l2=target_active_power_l2,
                 evse_target_active_power_l3=target_active_power_l3,
                 evse_target_reactive_power=target_reactive_power,
@@ -616,7 +714,6 @@ class EVSEControllerInterface(ABC):
                 evse_present_active_power_l2=present_active_power_l2,
                 evse_present_active_power_l3=present_active_power_l3,
             )
-            return scheduled_params
 
     # ============================================================================
     # |                          DC-SPECIFIC FUNCTIONS                           |
@@ -810,28 +907,44 @@ class EVSEControllerInterface(ABC):
         - ISO 15118-2
         """
         # This is currently being used by -2 only.
+        logger.info(
+            "Extracting the Session Current Limit " "based on Session Limits with. "
+        )
+        logger.debug("This method is used both in CPD and " "ChargeLoop in -2")
         session_limits = self.evse_data_context.session_limits
+        rated_limits = self.evse_data_context.rated_limits
         if self.evse_data_context.current_type == CurrentType.AC:
+            logger.debug("Gettint EVSE Max Current for AC...")
+            logger.debug(f"Active Rated Limits: {rated_limits.ac_limits}")
+            logger.debug(f"Active Session Limits: {session_limits.ac_limits}")
             ac_limits = session_limits.ac_limits
-            min_session_power_limit = ac_limits.max_charge_power
-            if ac_limits.max_charge_power_l2:
-                min_session_power_limit = min(
-                    min_session_power_limit, ac_limits.max_charge_power_l2
-                )
-            if ac_limits.max_charge_power_l3:
-                min_session_power_limit = min(
-                    min_session_power_limit, ac_limits.max_charge_power_l3
-                )
+            if ac_limits.max_charge_power > 0:
+                logger.info("Applying a Charging limit")
+                total_power_limit: float = ac_limits.max_charge_power
+                if ac_limits.max_charge_power_l2:
+                    total_power_limit += ac_limits.max_charge_power_l2
+                if ac_limits.max_charge_power_l3:
+                    total_power_limit += ac_limits.max_charge_power_l3
+            elif ac_limits.max_discharge_power and ac_limits.max_discharge_power > 0:
+                logger.info("Applying a Discharging limit")
+                total_power_limit = (-1) * ac_limits.max_discharge_power
+                if ac_limits.max_discharge_power_l2:
+                    total_power_limit -= ac_limits.max_discharge_power_l2
+                if ac_limits.max_discharge_power_l3:
+                    total_power_limit -= ac_limits.max_discharge_power_l3
             present_voltage = self.evse_data_context.present_voltage
             if present_voltage == 0:
-                present_voltage = self.evse_data_context.nominal_voltage
-            if present_voltage == 0:
-                present_voltage = 230
                 logger.warning(
                     "Present voltage and nominal voltage are 0,"
-                    "using 230 Vrms as default"
+                    "using Nominal voltage as default"
                 )
-            current_limit_phase = min_session_power_limit / present_voltage
+                present_voltage = self.evse_data_context.nominal_voltage
+                if not present_voltage:
+                    logger.error("Present voltage and nominal voltage are 0")
+                    raise ValueError("Present voltage and nominal voltage are 0")
+            logger.debug(f"Total Power Limit to Set: {total_power_limit}")
+            current_limit_phase = total_power_limit / present_voltage
+            logger.debug(f"Active EVSEMaxCurrent limit: {current_limit_phase}")
             exponent, value = PhysicalValue.get_exponent_value_repr(current_limit_phase)
             return PVEVSEMaxCurrent(
                 multiplier=exponent,
@@ -839,7 +952,17 @@ class EVSEControllerInterface(ABC):
                 unit=UnitSymbol.AMPERE,
             )
         elif self.evse_data_context.current_type == CurrentType.DC:
-            current_limit = session_limits.dc_limits.max_charge_current
+            logger.debug("Getting EVSE Max Current for DC...")
+            logger.debug(f"Active Rated Limits: {rated_limits.dc_limits}")
+            logger.debug(f"Active Session Limits: {session_limits.dc_limits}")
+            max_discharge_current = session_limits.dc_limits.max_discharge_current
+            if max_discharge_current and max_discharge_current > 0:
+                logger.info("Applying a Discharging limit")
+                current_limit = (-1) * session_limits.dc_limits.max_discharge_current
+            else:
+                logger.info("Applying a Charging limit")
+                current_limit = session_limits.dc_limits.max_charge_current
+            logger.debug(f"Active EVSEMaxCurrentLimit: {current_limit}")
             exponent, value = PhysicalValue.get_exponent_value_repr(current_limit)
             return PVEVSEMaxCurrentLimit(
                 multiplier=exponent,
@@ -869,9 +992,17 @@ class EVSEControllerInterface(ABC):
         - ISO 15118-2
         """
         session_limits = self.evse_data_context.session_limits
-        if session_limits.dc_limits.max_charge_power is None:
-            return None
-        power_limit = session_limits.dc_limits.max_charge_power
+        max_discharge_power = 0.0
+        max_charge_power = 0.0
+        if session_limits.dc_limits.max_discharge_power:
+            max_discharge_power = session_limits.dc_limits.max_discharge_power
+        else:
+            max_charge_power = session_limits.dc_limits.max_charge_power
+        # Update of the power limit based on the session limits
+        if max_discharge_power > 0:
+            power_limit = (-1) * max_discharge_power
+        else:
+            power_limit = max_charge_power
         exponent, value = PhysicalValue.get_exponent_value_repr(power_limit)
         return PVEVSEMaxPowerLimit(
             multiplier=exponent,

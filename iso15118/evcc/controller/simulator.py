@@ -49,7 +49,9 @@ from iso15118.shared.messages.enums import (
     ServiceV20,
     UnitSymbol,
 )
-from iso15118.shared.messages.iso15118_2.datatypes import ACEVChargeParameter
+from iso15118.shared.messages.iso15118_2.datatypes import (
+    ACEVChargeParameter,
+)
 from iso15118.shared.messages.iso15118_2.datatypes import (
     ChargeProgress as ChargeProgressV2,
 )
@@ -119,6 +121,7 @@ class SimEVController(EVControllerInterface):
     def __init__(self, evcc_config: EVCCConfig):
         self.config = evcc_config
         self.charging_loop_cycles: int = max(evcc_config.charge_loop_cycle, 1)
+        self.charge_loop_delay_time: int = min(evcc_config.charge_loop_delay_time, 50)
         self.increment = (1 / self.charging_loop_cycles) * 100
         self.precharge_loop_cycles: int = 0
         self.welding_detection_cycles: int = 0
@@ -529,6 +532,10 @@ class SimEVController(EVControllerInterface):
             ChargingProfile(profile_entries=evcc_profile_entry_list),
         )
 
+    async def charge_loop_delay(self) -> int:
+        """Overrides EVControllerInterface.delay_charge_loop()."""
+        return self.charge_loop_delay_time
+
     async def continue_charging(self) -> bool:
         """Overrides EVControllerInterface.continue_charging()."""
         if self.charging_loop_cycles == 0 or await self.is_charging_complete():
@@ -572,11 +579,7 @@ class SimEVController(EVControllerInterface):
     async def get_dc_ev_power_delivery_parameter_dinspec(
         self,
     ) -> DCEVPowerDeliveryParameterDINSPEC:
-        return DCEVPowerDeliveryParameterDINSPEC(
-            dc_ev_status=await self.get_dc_ev_status_dinspec(),
-            bulk_charging_complete=False,
-            charging_complete=await self.continue_charging(),
-        )
+        pass
 
     async def get_dc_ev_power_delivery_parameter(self) -> DCEVPowerDeliveryParameter:
         return DCEVPowerDeliveryParameter(

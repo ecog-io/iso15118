@@ -105,14 +105,19 @@ from iso15118.shared.messages.enums import (
     Namespace,
     UnitSymbol,
 )
-from iso15118.shared.messages.iso15118_2.body import EMAID
+from iso15118.shared.messages.iso15118_2.body import (
+    EMAID,
+)
 from iso15118.shared.messages.iso15118_2.body import (
     AuthorizationReq as AuthorizationReqV2,
 )
 from iso15118.shared.messages.iso15118_2.body import (
     AuthorizationRes as AuthorizationResV2,
 )
-from iso15118.shared.messages.iso15118_2.body import CableCheckReq, CableCheckRes
+from iso15118.shared.messages.iso15118_2.body import (
+    CableCheckReq,
+    CableCheckRes,
+)
 from iso15118.shared.messages.iso15118_2.body import (
     CertificateInstallationReq as CertificateInstallationReqV2,
 )
@@ -141,7 +146,10 @@ from iso15118.shared.messages.iso15118_2.body import (
 from iso15118.shared.messages.iso15118_2.body import (
     PowerDeliveryRes as PowerDeliveryResV2,
 )
-from iso15118.shared.messages.iso15118_2.body import PreChargeReq, PreChargeRes
+from iso15118.shared.messages.iso15118_2.body import (
+    PreChargeReq,
+    PreChargeRes,
+)
 from iso15118.shared.messages.iso15118_2.body import ResponseCode as ResponseCodeV2
 from iso15118.shared.messages.iso15118_2.body import (
     ServiceDetailReq as ServiceDetailReqV2,
@@ -269,7 +277,10 @@ from iso15118.shared.messages.iso15118_20.common_messages import (
 from iso15118.shared.messages.iso15118_20.common_types import (
     MessageHeader as MessageHeaderV20,
 )
-from iso15118.shared.messages.iso15118_20.common_types import Processing, RationalNumber
+from iso15118.shared.messages.iso15118_20.common_types import (
+    Processing,
+    RationalNumber,
+)
 from iso15118.shared.messages.iso15118_20.common_types import (
     ResponseCode as ResponseCodeV20,
 )

@@ -32,7 +32,9 @@ from iso15118.shared.messages.enums import (
     Namespace,
     Protocol,
 )
-from iso15118.shared.messages.iso15118_2.body import BodyBase
+from iso15118.shared.messages.iso15118_2.body import (
+    BodyBase,
+)
 from iso15118.shared.messages.iso15118_2.body import (
     SessionSetupReq as SessionSetupReqV2,
 )
@@ -47,7 +49,9 @@ from iso15118.shared.messages.iso15118_20.common_types import (
 from iso15118.shared.messages.iso15118_20.common_types import (
     V2GMessage as V2GMessageV20,
 )
-from iso15118.shared.messages.iso15118_20.common_types import V2GRequest
+from iso15118.shared.messages.iso15118_20.common_types import (
+    V2GRequest,
+)
 from iso15118.shared.messages.timeouts import Timeouts as TimeoutsShared
 from iso15118.shared.states import State, Terminate
 

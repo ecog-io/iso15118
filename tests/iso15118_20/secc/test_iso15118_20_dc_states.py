@@ -1005,7 +1005,7 @@ class TestEvScenarios:
             ),
             (
                 ControlMode.DYNAMIC,
-                Terminate,
+                DCChargeLoop,
                 SelectedEnergyService(
                     service=ServiceV20.DC, is_free=True, parameter_set=None
                 ),
