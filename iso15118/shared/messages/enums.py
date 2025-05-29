@@ -330,6 +330,8 @@ class ServiceV20(Enum):
     AC_BPT = 5
     DC_BPT = 6
     DC_ACDP_BPT = 7
+    MCS = 8
+    MCS_BPT = 9
     INTERNET = 65
     PARKING_STATUS = 66
 

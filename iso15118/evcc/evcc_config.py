@@ -73,6 +73,9 @@ class EVCCConfig(BaseModel):
     charge_loop_cycle: Optional[int] = Field(10, alias="chargeLoopCycle")
     # charge loop cycle delay before next cycle
     charge_loop_delay_time: Optional[int] = Field(0, alias="chargeLoopDelay")
+    # precharge cycle count
+    precharge_loop_cycle: Optional[int] = Field(1000, alias="prechargeLoopCycle")
+
 
     def load_raw_values(self):
         # conversion of list of strings to enum types.
@@ -114,6 +117,7 @@ async def load_from_file(file_name: str) -> EVCCConfig:
     try:
         async with async_open(file_name, "r") as f:
             json_content = await f.read()
+            print(json_content)
             data = json.loads(json_content)
             ev_config = EVCCConfig(**data)
             ev_config.load_raw_values()

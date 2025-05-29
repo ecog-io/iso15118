@@ -763,14 +763,22 @@ class ServiceSelection(StateEVCC):
         elif self.comm_session.selected_energy_service.service in (
             ServiceV20.DC,
             ServiceV20.DC_BPT,
+            ServiceV20.MCS,
+            ServiceV20.MCS_BPT,
         ):
             dc_params, bpt_dc_params = None, None
             self.comm_session.selected_charging_type_is_ac = False
-            if self.comm_session.selected_energy_service.service == ServiceV20.DC:
+            if self.comm_session.selected_energy_service.service in [
+                ServiceV20.DC,
+                ServiceV20.MCS,
+            ]:
                 dc_params = await self.comm_session.ev_controller.get_charge_params_v20(
                     self.comm_session.selected_energy_service
                 )
-            else:
+            elif self.comm_session.selected_energy_service.service in [
+                ServiceV20.DC_BPT,
+                ServiceV20.MCS_BPT,
+            ]:
                 bpt_dc_params = (
                     await self.comm_session.ev_controller.get_charge_params_v20(
                         self.comm_session.selected_energy_service

@@ -519,10 +519,12 @@ def log_certs_details(certs: List[bytes]):
 
 
 def _validate_signature(
-    cert_to_check, parent_pub_key: Union[EllipticCurvePublicKey, Ed448PublicKey]
+    cert_to_check,
+    parent_pub_key: Union[EllipticCurvePublicKey, Ed448PublicKey],
 ) -> None:
     if isinstance(parent_pub_key, EllipticCurvePublicKey):
         ec_curve_name = parent_pub_key.curve.name
+        hash_algorithm: Union[SHA256, SHA512] = SHA256()
         if ec_curve_name == "secp256r1":
             hash_algorithm = SHA256()
         elif ec_curve_name == "secp521r1":
@@ -679,7 +681,7 @@ def verify_certs(
             # In a PE there is no SubCAs, which means the
             # root signs directly the leaf
             parent_cert_pub_key = root_ca_cert.public_key()
-            _validate_signature(cert_to_check, parent_cert_pub_key)
+            _validate_signature(cert_to_check, parent_cert_pub_key)  # noqa
         else:
 
             parent_cert_pub_key = sub_ca2_cert.public_key()
@@ -993,6 +995,7 @@ def verify_signature(
     try:
         if isinstance(pub_key, EllipticCurvePublicKey):
             ec_curve_name = pub_key.curve.name
+            hash_algorithm: Union[SHA256, SHA512] = SHA256()
             if ec_curve_name == "secp256r1":
                 hash_algorithm = SHA256()
             elif ec_curve_name == "secp521r1":

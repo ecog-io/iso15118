@@ -211,7 +211,7 @@ class SessionStateMachine(ABC):
         except V2GMessageValidationError as exc:
             logger.error(
                 f"EXI message (ns={self.get_exi_ns(v2gtp_msg.payload_type)}) "
-                f"where validation failed: {v2gtp_msg.payload.hex()}"
+                f"where validation failed: {v2gtp_msg.payload.hex()}. Error: ..{exc}.."
             )
             raise exc
         except EXIDecodingError as exc:
