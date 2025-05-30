@@ -43,7 +43,7 @@ class EVCCConfig(BaseModel):
     # the EV can store. That value is used in the CertificateInstallationReq.
     # Must be an integer between 0 and 65535, should be bigger than 0.
     max_contract_certs: Optional[int] = Field(3, alias="maxContractCerts")
-    # Indicates whether or not the EVCC should always enforce a TLS-secured
+    # Indicates whether the EVCC should always enforce a TLS-secured
     # communication session.
     # If True, the EVCC will only continue setting up a communication session if
     # the SECC's SDP response has the Security field set
@@ -73,6 +73,8 @@ class EVCCConfig(BaseModel):
     charge_loop_cycle: Optional[int] = Field(10, alias="chargeLoopCycle")
     # charge loop cycle delay before next cycle
     charge_loop_delay_time: Optional[int] = Field(0, alias="chargeLoopDelay")
+    # precharge cycle count
+    precharge_loop_cycle: Optional[int] = Field(1000, alias="prechargeLoopCycle")
 
     def load_raw_values(self):
         # conversion of list of strings to enum types.
@@ -114,6 +116,7 @@ async def load_from_file(file_name: str) -> EVCCConfig:
     try:
         async with async_open(file_name, "r") as f:
             json_content = await f.read()
+            print(json_content)
             data = json.loads(json_content)
             ev_config = EVCCConfig(**data)
             ev_config.load_raw_values()

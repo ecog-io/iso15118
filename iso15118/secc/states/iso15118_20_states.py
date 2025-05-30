@@ -249,16 +249,19 @@ class AuthorizationSetup(StateSECC):
             await SessionStop(self.comm_session).process_message(message, message_exi)
             return
 
-        auth_options: List[AuthEnum] = []
+        offered_auth_options: List[AuthEnum] = []
         eim_as_res, pnc_as_res = None, None
-        supported_auth_options = []
-        if self.comm_session.evse_controller.is_eim_authorized():
-            supported_auth_options.append(AuthEnum.EIM)
-        else:
-            supported_auth_options = self.comm_session.config.supported_auth_options
+        supported_auth_options: List[AuthEnum] = (
+            self.comm_session.config.supported_auth_options
+        )  # noqa: E501
+        is_eim_authorized: bool = self.comm_session.evse_controller.is_eim_authorized()
 
-        if AuthEnum.PNC in supported_auth_options:
-            auth_options.append(AuthEnum.PNC)
+        if (
+            AuthEnum.PNC in supported_auth_options
+            and self.comm_session.is_tls
+            and not is_eim_authorized
+        ):
+            offered_auth_options.append(AuthEnum.PNC)
             self.comm_session.gen_challenge = get_random_bytes(16)
             pnc_as_res = PnCAuthSetupResParams(
                 gen_challenge=self.comm_session.gen_challenge,
@@ -266,7 +269,7 @@ class AuthorizationSetup(StateSECC):
             )
 
         if AuthEnum.EIM in supported_auth_options:
-            auth_options.append(AuthEnum.EIM)
+            offered_auth_options.append(AuthEnum.EIM)
             if not pnc_as_res:
                 # Only if Plug & Charge is not offered as an authorization option, then
                 # we offer EIM (according to [V2G20-2567] and [V2G20-2568]). Also, the
@@ -276,14 +279,14 @@ class AuthorizationSetup(StateSECC):
 
         # TODO [V2G20-2570]
 
-        self.comm_session.offered_auth_options = auth_options
+        self.comm_session.offered_auth_options = offered_auth_options
 
         auth_setup_res = AuthorizationSetupRes(
             header=MessageHeader(
                 session_id=self.comm_session.session_id, timestamp=time.time()
             ),
             response_code=ResponseCode.OK,
-            auth_services=auth_options,
+            auth_services=offered_auth_options,
             cert_install_service=self.comm_session.config.allow_cert_install_service,
             eim_as_res=eim_as_res,
             pnc_as_res=pnc_as_res,

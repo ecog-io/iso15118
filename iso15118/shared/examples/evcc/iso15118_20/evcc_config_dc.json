@@ -6,5 +6,6 @@
 		"DC"
 	],
 	"isCertInstallNeeded": false,
-	"useTls": false
+	"useTls": false,
+	"prechargeLoopCycle": 10
 }

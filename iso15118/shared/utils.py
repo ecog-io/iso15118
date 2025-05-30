@@ -50,6 +50,8 @@ def load_requested_energy_services(
         "DC_ACDP_BPT",
         "INTERNET",
         "PARKING_STATUS",
+        "MCS",
+        "MCS_BPT",
     ]
 
     services = _format_list(read_services)

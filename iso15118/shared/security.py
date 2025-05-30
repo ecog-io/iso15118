@@ -16,12 +16,13 @@ from cryptography.hazmat.primitives.asymmetric.ec import (
     EllipticCurvePrivateKey,
     EllipticCurvePublicKey,
 )
+from cryptography.hazmat.primitives.asymmetric.ed448 import Ed448PublicKey
 from cryptography.hazmat.primitives.asymmetric.utils import (
     decode_dss_signature,
     encode_dss_signature,
 )
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
-from cryptography.hazmat.primitives.hashes import SHA256, Hash, HashAlgorithm
+from cryptography.hazmat.primitives.hashes import SHA256, SHA512, Hash, HashAlgorithm
 from cryptography.hazmat.primitives.kdf.concatkdf import ConcatKDFHash
 from cryptography.hazmat.primitives.serialization import (
     Encoding,
@@ -115,7 +116,10 @@ def get_ssl_context(server_side: bool) -> Optional[SSLContext]:
     (as given in ISO 15118-2) map to the OpenSSL cipher suite names
     - ECDH-ECDSA-AES128-SHA256 and
     - ECDHE-ECDSA-AES128-SHA256,
-    respectively. See https://testssl.sh/openssl-iana.mapping.html
+    respectively.
+    Check:
+        * https://testssl.sh/openssl-iana.mapping.html
+        * https://www.openssl.org/docs/man1.1.1/man1/ciphers.html
     TODO More/other cipher suites are allowed in ISO 15118-20
 
     Args:
@@ -129,18 +133,44 @@ def get_ssl_context(server_side: bool) -> Optional[SSLContext]:
          Need to figure out a way to securely store those certs and keys
          as well as read the password.
     """
-
-    if shared_settings[SettingKey.ENABLE_TLS_1_3]:
-        ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS)
-    else:
-        # Specifying protocol as `PROTOCOL_TLS` does best effort.
-        # TLSv1.3 will be attempted and would fallback to 1.2 if not possible.
-        # However, there may be TLS clients that can't perform
-        # 1.2 fallback, here we explicitly set the TLS version
-        # to 1.2, to be sure we won't fall into connection issues
-        ssl_context = SSLContext(protocol=ssl.PROTOCOL_TLSv1_2)
-
     if server_side:
+        ssl_context = SSLContext(ssl.PROTOCOL_TLS_SERVER)
+        # By default, the min TLS version is set to TLS 1.2
+        # if one wants to change the min or max version, it can do
+        # it with:
+        # ssl_context.minimum_version = ssl.TLSVersion.TLSv1_2
+        # ssl_context.maximum_version = ssl.TLSVersion.TLSv1_3
+
+        # The setting above could be paired with an ENV variable to
+        # force TLS 1.3 and setting one of the ciphers that -20 allows:
+        # The OpenSSL name for ECDH curve secp256r1 is prime256v1
+        # The OpenSSL name for ECDH curve secp521r1 is secp521r1
+        # The OpenSSL name for ECDH curve x448 is x448
+        # The `set_ecdh_curve` could be used to set a curve that the server
+        # supports, but we would be limited to only that curve and
+        # we wouldnt be able to use be compliant with -20 and -2
+        # requirements at the same time
+        #  ssl_context.set_ecdh_curve("prime256v1")
+
+        # OCSP stapling is not possible with python ssl and an external library
+        # like PyOpenSSL shall be used. However, we cant use it directly as
+        # a context to the asyncio.start_server, because PyOpenSSL SSL.Context
+        # is not compatible with the CPython SSLContext; thus we must do like
+        # pymongo did and create a wrapper for PyOpenSSL:
+        # https://github.com/pyca/pyopenssl/issues/1022#issuecomment-920187014
+        # https://github.com/mongodb/mongo-python-driver/blob/3.12.0/pymongo/pyopenssl_context.py#L167  # noqa
+        # pymongo setup a client side, but we also need the server side:
+        # https://github.com/pyca/pyopenssl/blob/main/src/OpenSSL/SSL.py#L1653
+
+        if shared_settings[SettingKey.FORCE_TLS_CLIENT_AUTH]:
+            # In 15118-20 we should also verify EVCC's certificate chain.
+            # The spec however says TLS 1.3 should also support 15118-2
+            # (Table 5 in V2G20 specification)
+            ssl_context.load_verify_locations(cafile=CertPath.OEM_ROOT_PEM)
+            ssl_context.verify_mode = VerifyMode.CERT_REQUIRED
+        else:
+            # In ISO 15118-2, we only verify the SECC's certificates
+            ssl_context.verify_mode = VerifyMode.CERT_NONE
         try:
             ssl_context.load_cert_chain(
                 certfile=CertPath.CPO_CERT_CHAIN_PEM,
@@ -162,17 +192,6 @@ def get_ssl_context(server_side: bool) -> Optional[SSLContext]:
             logger.exception(exc)
             return None
 
-        if shared_settings[SettingKey.ENABLE_TLS_1_3]:
-            # In 15118-20 we should also verify EVCC's certificate chain.
-            # The spec however says TLS 1.3 should also support 15118-2
-            # (Table 5 in V2G20 specification)
-            # Marc/André - this suggests we will need mutual auth 15118-2 if
-            # TLS1.3 is enabled.
-            ssl_context.load_verify_locations(cafile=CertPath.OEM_ROOT_PEM)
-            ssl_context.verify_mode = VerifyMode.CERT_REQUIRED
-        else:
-            # In ISO 15118-2, we only verify the SECC's certificates
-            ssl_context.verify_mode = VerifyMode.CERT_NONE
         # The SECC must support both ciphers defined in ISO 15118-20
         # OpenSSL 1.3 supports TLS 1.3 cipher suites by default.
         # Calling .set_ciphers to be more evident about what is available.
@@ -188,6 +207,7 @@ def get_ssl_context(server_side: bool) -> Optional[SSLContext]:
             "ECDHE-ECDSA-AES128-SHA256"
         )
     else:
+        ssl_context = SSLContext(ssl.PROTOCOL_TLS_CLIENT)
         # Load the V2G Root CA certificate(s) to validate the SECC's leaf and
         # Sub-CA CPO certificates. The cafile string is the path to a file of
         # concatenated (if several exist) V2G Root CA certificates in PEM format
@@ -203,7 +223,8 @@ def get_ssl_context(server_side: bool) -> Optional[SSLContext]:
             "ECDHE-ECDSA-AES128-SHA256"
         )
 
-        if shared_settings[SettingKey.ENABLE_TLS_1_3]:
+        if shared_settings[SettingKey.FORCE_TLS_CLIENT_AUTH]:
+            logger.debug("LOADING CERTIFICATES OEM")
             try:
                 ssl_context.load_cert_chain(
                     certfile=CertPath.OEM_CERT_CHAIN_PEM,
@@ -225,8 +246,26 @@ def get_ssl_context(server_side: bool) -> Optional[SSLContext]:
                 logger.exception(exc)
                 return None
 
-    # The OpenSSL name for ECDH curve secp256r1 is prime256v1
-    ssl_context.set_ecdh_curve("prime256v1")
+    if hasattr(ssl_context, "keylog_filename"):
+        # It is possible to decrypt the TLS frames, using wireshark
+        # if the keylogfile is generated with the pre-master secret
+        # The file is generated when DEBUG level mode is set and
+        # the file must be loaded in wireshark as explained here:
+        # https://wiki.wireshark.org/TLS#using-the-pre-master-secret
+        # References:
+        # https://wiki.wireshark.org/TLS
+        # https://docs.python.org/3/library/ssl.html#ssl.create_default_context
+        # https://docs.python.org/3/library/ssl.html#ssl.SSLContext.keylog_filename
+        # https://github.com/python/cpython/blob/3.11/Lib/ssl.py#L777
+        keylogfile = os.path.join(
+            str(shared_settings[SettingKey.PKI_PATH]), "keylogfile.txt"
+        )
+        if logging.getLogger().level == logging.DEBUG:
+            if not os.path.exists(keylogfile):
+                with open(keylogfile, "w"):
+                    pass
+            logger.debug(f"TLS (Pre)-Master-Secret log filename path: {keylogfile}")
+            ssl_context.keylog_filename = keylogfile
 
     return ssl_context
 
@@ -478,6 +517,37 @@ def log_certs_details(certs: List[bytes]):
         logger.debug("===")
 
 
+def _validate_signature(
+    cert_to_check,
+    parent_pub_key: Union[EllipticCurvePublicKey, Ed448PublicKey],
+) -> None:
+    if isinstance(parent_pub_key, EllipticCurvePublicKey):
+        ec_curve_name = parent_pub_key.curve.name
+        hash_algorithm: Union[SHA256, SHA512] = SHA256()
+        if ec_curve_name == "secp256r1":
+            hash_algorithm = SHA256()
+        elif ec_curve_name == "secp521r1":
+            hash_algorithm = SHA512()
+        else:
+            raise KeyTypeError(
+                f"Unexpected curve name "
+                f"{ec_curve_name}."
+                f"None of secp256r1, secp521r1"
+            )
+        parent_pub_key.verify(
+            cert_to_check.signature,
+            cert_to_check.tbs_certificate_bytes,
+            ec.ECDSA(hash_algorithm),
+        )
+    elif isinstance(parent_pub_key, Ed448PublicKey):
+        parent_pub_key.verify(
+            cert_to_check.signature,
+            cert_to_check.tbs_certificate_bytes,
+        )
+    else:
+        raise KeyTypeError(f"Unexpected public key type " f"{type(parent_pub_key)}")
+
+
 def verify_certs(
     leaf_cert_bytes: bytes,
     sub_ca_certs_bytes: List[bytes],
@@ -532,7 +602,7 @@ def verify_certs(
         certs_to_check: List[Certificate] = [leaf_cert]
         if len(sub_ca_der_certs) != 0:
             certs_to_check.extend(sub_ca_der_certs)
-        check_validity(certs_to_check)
+        _check_validity(certs_to_check)
     except (CertNotYetValidError, CertExpiredError) as exc:
         raise exc
 
@@ -590,9 +660,15 @@ def verify_certs(
             raise CertChainLengthError(allowed_num_sub_cas=2, num_sub_cas=path_len)
 
     if not sub_ca2_cert and not private_environment:
+        logger.error("Sub-CA 2 certificate missing in public cert chain")
         raise CertChainLengthError(allowed_num_sub_cas=2, num_sub_cas=0)
 
     if (sub_ca2_cert or sub_ca1_cert) and private_environment:
+        logger.error(
+            "Sub-CA 1 and 2 certificate are included and "
+            "PE is set at the same time. "
+            "In a PE there are no Sub-CA certs"
+        )
         raise CertChainLengthError(allowed_num_sub_cas=0, num_sub_cas=1)
 
     # Step 2.b: Now that we have established the right order of sub-CA
@@ -601,85 +677,30 @@ def verify_certs(
     cert_to_check = leaf_cert
     try:
         if private_environment:
-            if isinstance(pub_key := root_ca_cert.public_key(), EllipticCurvePublicKey):
-                pub_key.verify(
-                    leaf_cert.signature,
-                    leaf_cert.tbs_certificate_bytes,
-                    ec.ECDSA(SHA256()),
-                )
-            else:
-                # TODO Add support for ISO 15118-20 public key types
-                raise KeyTypeError(
-                    f"Unexpected public key type " f"{type(root_ca_cert.public_key())}"
-                )
-        elif not sub_ca2_cert:
-            logger.error("Sub-CA 2 certificate missing in public cert chain")
-            raise CertChainLengthError(allowed_num_sub_cas=2, num_sub_cas=0)
+            # In a PE there is no SubCAs, which means the
+            # root signs directly the leaf
+            parent_cert_pub_key = root_ca_cert.public_key()
+            _validate_signature(cert_to_check, parent_cert_pub_key)  # type: ignore
         else:
-            if isinstance(pub_key := sub_ca2_cert.public_key(), EllipticCurvePublicKey):
-                pub_key.verify(
-                    leaf_cert.signature,
-                    leaf_cert.tbs_certificate_bytes,
-                    # TODO Find a way to read id dynamically from the certificate
-                    ec.ECDSA(SHA256()),
-                )
-            else:
-                # TODO Add support for ISO 15118-20 public key types
-                raise KeyTypeError(
-                    f"Unexpected public key type " f"{type(sub_ca2_cert.public_key())}"
-                )
+            parent_cert_pub_key = sub_ca2_cert.public_key()
+            _validate_signature(cert_to_check, parent_cert_pub_key)  # type: ignore
 
             if sub_ca1_cert:
+                # check subca2 signature
                 cert_to_check = sub_ca2_cert
+                parent_cert_pub_key = sub_ca1_cert.public_key()
+                _validate_signature(cert_to_check, parent_cert_pub_key)  # type: ignore
 
-                if isinstance(
-                    pub_key := sub_ca1_cert.public_key(), EllipticCurvePublicKey
-                ):
-                    pub_key.verify(
-                        sub_ca2_cert.signature,
-                        sub_ca2_cert.tbs_certificate_bytes,
-                        ec.ECDSA(SHA256()),
-                    )
-                else:
-                    # TODO Add support for ISO 15118-20 public key types
-                    raise KeyTypeError(
-                        f"Unexpected public key type "
-                        f"{type(sub_ca1_cert.public_key())}"
-                    )
-
+                # check subca1 signature
                 cert_to_check = sub_ca1_cert
-
-                if isinstance(
-                    pub_key := root_ca_cert.public_key(), EllipticCurvePublicKey
-                ):
-                    pub_key.verify(
-                        sub_ca1_cert.signature,
-                        sub_ca1_cert.tbs_certificate_bytes,
-                        ec.ECDSA(SHA256()),
-                    )
-                else:
-                    # TODO Add support for ISO 15118-20 public key types
-                    raise KeyTypeError(
-                        f"Unexpected public key type "
-                        f"{type(root_ca_cert.public_key())}"
-                    )
+                parent_cert_pub_key = root_ca_cert.public_key()
+                _validate_signature(cert_to_check, parent_cert_pub_key)  # type: ignore
             else:
+                # the chain contains only the root and subca2, ie
+                # the subca2 is directly signed by the root
                 cert_to_check = sub_ca2_cert
-
-                if isinstance(
-                    pub_key := root_ca_cert.public_key(), EllipticCurvePublicKey
-                ):
-                    pub_key.verify(
-                        sub_ca2_cert.signature,
-                        sub_ca2_cert.tbs_certificate_bytes,
-                        ec.ECDSA(SHA256()),
-                    )
-                else:
-                    # TODO Add support for ISO 15118-20 public key types
-                    raise KeyTypeError(
-                        f"Unexpected public key type "
-                        f"{type(root_ca_cert.public_key())}"
-                    )
+                parent_cert_pub_key = root_ca_cert.public_key()
+                _validate_signature(cert_to_check, parent_cert_pub_key)  # type: ignore
     except InvalidSignature as exc:
         raise CertSignatureError(
             subject=cert_to_check.subject.__str__(),
@@ -706,13 +727,26 @@ def verify_certs(
             f"of certificate {cert_to_check.subject}"
         )
 
+    # Step 2: Check that each certificate is valid, i.e. the current time is
+    #         between the notBefore and notAfter timestamps of the certificate
+    try:
+        if sub_ca2_cert:
+            certs_to_check.append(sub_ca2_cert)
+        if sub_ca1_cert:
+            certs_to_check.append(sub_ca1_cert)
+        certs_to_check.append(root_ca_cert)
+        _check_validity(certs_to_check)
+    except (CertNotYetValidError, CertExpiredError) as exc:
+        raise exc
+
     # Step 3: Check the OCSP (Online Certificate Status Protocol) response to
     #         see whether or not a certificate has been revoked
+
     # TODO As OCSP is not supported for the CharIN Testival Europe 2021, we'll
     #      postpone that step a bit
 
 
-def check_validity(certs: List[Certificate]):
+def _check_validity(certs: List[Certificate]):
     """
     Checks that the current time is between the notBefore and notAfter
     timestamps of each certificate provided in the list.
@@ -958,13 +992,29 @@ def verify_signature(
 
     try:
         if isinstance(pub_key, EllipticCurvePublicKey):
+            ec_curve_name = pub_key.curve.name
+            hash_algorithm: Union[SHA256, SHA512] = SHA256()
+            if ec_curve_name == "secp256r1":
+                hash_algorithm = SHA256()
+            elif ec_curve_name == "secp521r1":
+                hash_algorithm = SHA512()
+            else:
+                raise KeyTypeError(
+                    f"Unexpected curve name "
+                    f"{ec_curve_name}."
+                    f"None of secp256r1, secp521r1"
+                )
             pub_key.verify(
                 signature=der_encoded_signature,
                 data=exi_encoded_signed_info,
-                signature_algorithm=ec.ECDSA(SHA256()),
+                signature_algorithm=ec.ECDSA(hash_algorithm),
+            )
+        elif isinstance(pub_key, Ed448PublicKey):
+            pub_key.verify(
+                signature=der_encoded_signature,
+                data=exi_encoded_signed_info,
             )
         else:
-            # TODO Add support for ISO 15118-20 public key types
             raise KeyTypeError(f"Unexpected public key type " f"{type(pub_key)}")
     except InvalidSignature as e:
         pub_key_bytes = pub_key.public_bytes(

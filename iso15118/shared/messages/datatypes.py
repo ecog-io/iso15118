@@ -544,6 +544,7 @@ class DCEVChargeParams(BaseModel):
     dc_max_voltage_limit: PVEVMaxVoltageLimit
     dc_energy_capacity: PVEVEnergyCapacity
     dc_target_current: PVEVTargetCurrent
+    dc_precharge_target_current: PVEVTargetCurrent
     dc_target_voltage: PVEVTargetVoltage
 
 

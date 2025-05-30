@@ -51,6 +51,9 @@ def get_dc_charge_params():
         dc_target_current=PVEVTargetCurrent(
             multiplier=0, value=1, unit=UnitSymbol.AMPERE
         ),
+        dc_precharge_target_current=PVEVTargetCurrent(
+            multiplier=0, value=1, unit=UnitSymbol.AMPERE
+        ),
         dc_target_voltage=PVEVTargetVoltage(
             multiplier=0, value=400, unit=UnitSymbol.VOLTAGE
         ),

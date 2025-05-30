@@ -127,10 +127,10 @@ then
     EC_CURVE=prime256v1
 else
     ISO_FOLDER=iso15118_20
-    SYMMETRIC_CIPHER=-aes-128-cbc  # TODO Check correct version for ISO 15118-20
-    SYMMETRIC_CIPHER_PKCS12=-aes128  # TODO Check correct version for ISO 15118-20
-    SHA=-sha256  # TODO Check correct version for ISO 15118-20
-    EC_CURVE=prime256v1  # TODO Check correct version for ISO 15118-20
+    SYMMETRIC_CIPHER=-aes-128-cbc # TODO Check correct version for ISO 15118-20
+    SYMMETRIC_CIPHER_PKCS12=-aes-128-cbc  # TODO Check correct version for ISO 15118-20
+    SHA=-sha512  # TODO Check correct version for ISO 15118-20
+    EC_CURVE=secp521r1  # TODO Check correct version for ISO 15118-20
     # TODO: Also enable cipher suite TLS_CHACHA20_POLY1305_SHA256
 fi
 
