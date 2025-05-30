@@ -13,7 +13,6 @@ from cryptography.hazmat.backends.openssl.backend import Backend
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.primitives.asymmetric.ec import (
     SECP256R1,
-    SECP521R1,
     EllipticCurvePrivateKey,
     EllipticCurvePublicKey,
 )
@@ -259,7 +258,7 @@ def get_ssl_context(server_side: bool) -> Optional[SSLContext]:
         # https://docs.python.org/3/library/ssl.html#ssl.SSLContext.keylog_filename
         # https://github.com/python/cpython/blob/3.11/Lib/ssl.py#L777
         keylogfile = os.path.join(
-            shared_settings[SettingKey.PKI_PATH], "keylogfile.txt"
+            str(shared_settings[SettingKey.PKI_PATH]), "keylogfile.txt"
         )
         if logging.getLogger().level == logging.DEBUG:
             if not os.path.exists(keylogfile):
@@ -681,28 +680,27 @@ def verify_certs(
             # In a PE there is no SubCAs, which means the
             # root signs directly the leaf
             parent_cert_pub_key = root_ca_cert.public_key()
-            _validate_signature(cert_to_check, parent_cert_pub_key)  # noqa
+            _validate_signature(cert_to_check, parent_cert_pub_key)  # type: ignore
         else:
-
             parent_cert_pub_key = sub_ca2_cert.public_key()
-            _validate_signature(cert_to_check, parent_cert_pub_key)
+            _validate_signature(cert_to_check, parent_cert_pub_key)  # type: ignore
 
             if sub_ca1_cert:
                 # check subca2 signature
                 cert_to_check = sub_ca2_cert
                 parent_cert_pub_key = sub_ca1_cert.public_key()
-                _validate_signature(cert_to_check, parent_cert_pub_key)
+                _validate_signature(cert_to_check, parent_cert_pub_key)  # type: ignore
 
                 # check subca1 signature
                 cert_to_check = sub_ca1_cert
                 parent_cert_pub_key = root_ca_cert.public_key()
-                _validate_signature(cert_to_check, parent_cert_pub_key)
+                _validate_signature(cert_to_check, parent_cert_pub_key)  # type: ignore
             else:
                 # the chain contains only the root and subca2, ie
                 # the subca2 is directly signed by the root
                 cert_to_check = sub_ca2_cert
                 parent_cert_pub_key = root_ca_cert.public_key()
-                _validate_signature(cert_to_check, parent_cert_pub_key)
+                _validate_signature(cert_to_check, parent_cert_pub_key)  # type: ignore
     except InvalidSignature as exc:
         raise CertSignatureError(
             subject=cert_to_check.subject.__str__(),

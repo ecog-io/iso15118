@@ -517,7 +517,7 @@ class CableCheck(StateEVCC):
         pre_charge_req = PreChargeReq(
             dc_ev_status=await ev_controller.get_dc_ev_status_dinspec(),
             ev_target_voltage=dc_charge_params.dc_target_voltage,
-            ev_target_current=dc_charge_params.dc_target_current,
+            ev_target_current=dc_charge_params.dc_precharge_target_current,
         )
         return pre_charge_req
 
@@ -596,7 +596,7 @@ class PreCharge(StateEVCC):
         pre_charge_req = PreChargeReq(
             dc_ev_status=await ev_controller.get_dc_ev_status_dinspec(),
             ev_target_voltage=dc_charge_params.dc_target_voltage,
-            ev_target_current=dc_charge_params.dc_target_current,
+            ev_target_current=dc_charge_params.dc_precharge_target_current,
         )
         return pre_charge_req
 

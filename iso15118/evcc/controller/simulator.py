@@ -143,6 +143,9 @@ class SimEVController(EVControllerInterface):
             dc_target_current=PVEVTargetCurrent(
                 multiplier=0, value=12, unit=UnitSymbol.AMPERE
             ),
+            dc_precharge_target_current=PVEVTargetCurrent(
+                multiplier=0, value=2, unit=UnitSymbol.AMPERE
+            ),
             dc_target_voltage=PVEVTargetVoltage(
                 multiplier=0, value=400, unit=UnitSymbol.VOLTAGE
             ),
@@ -569,21 +572,25 @@ class SimEVController(EVControllerInterface):
     ) -> bool:
         logger.info(f"Present EVSE voltage: {present_voltage_evse.get_decimal_value()}")
         logger.info(
-            f"Present EV   voltage: {(await self.get_present_voltage()).get_decimal_value()}"
+            f"Present EV "
+            f"voltage: {(await self.get_present_voltage()).get_decimal_value()}"
         )
+        self.precharge_loop_cycles -= 1
         if (
-            self.precharge_loop_cycles > 0
-            and (
-                abs(
-                    present_voltage_evse.get_decimal_value()
-                    - (await self.get_present_voltage()).get_decimal_value()
-                )
+            abs(
+                present_voltage_evse.get_decimal_value()
+                - (await self.get_present_voltage()).get_decimal_value()
             )
             < 5
         ):
             logger.info("Precharge done.")
             return True
-        self.precharge_loop_cycles -= 1
+        if self.precharge_loop_cycles <= 0:
+            logger.info(
+                "PCH cycle limit hit. Increase count "
+                "in ev config if a longer run is desired."
+            )
+            return True
         return False
 
     async def get_dc_ev_power_delivery_parameter_dinspec(

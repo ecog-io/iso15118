@@ -76,7 +76,6 @@ class EVCCConfig(BaseModel):
     # precharge cycle count
     precharge_loop_cycle: Optional[int] = Field(1000, alias="prechargeLoopCycle")
 
-
     def load_raw_values(self):
         # conversion of list of strings to enum types.
         self.supported_energy_services = load_requested_energy_services(
