@@ -886,6 +886,9 @@ class SimEVController(EVControllerInterface):
             charging_complete=await self.is_charging_complete(),
         )
 
+    async def is_service_hpc1_active(self) -> bool:
+        return EVEREST_EV_STATE.ServiceHPC1_Active
+
     # ============================================================================
     # |                          SAE J2847/2 FUNCTIONS                           |
     # ============================================================================

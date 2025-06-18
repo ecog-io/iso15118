@@ -30,6 +30,9 @@ class EVState:
     dc_discharge_max_power_limit: float = 0
     dc_discharge_target_current: float = 0
 
+    # Service HPC1
+    ServiceHPC1_Active: bool = False
+
     # SAE J2847/2
     SAEJ2847_V2H_V2G_Active = False
     minimal_soc = 20

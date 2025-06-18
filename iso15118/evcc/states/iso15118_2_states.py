@@ -344,8 +344,17 @@ class ServiceDiscovery(StateEVCC):
                 )
                 self.comm_session.sae_j2847_active = service.service_id
 
-            # Request more service details if you're interested in e.g.
-            # an Internet service or a use case-specific service
+            # check if service HPC1 is offered
+            if (service.service_category == ServiceCategory.CUSTOM
+                    and await self.comm_session.ev_controller.is_service_hpc1_active() == True
+                    and service.service_id == 63000):
+                self.comm_session.selected_services.append(
+                    SelectedService(service_id=service.service_id)
+                )
+                self.comm_session.service_hpc1_active = True
+
+        # Request more service details if you're interested in e.g.
+        # an Internet service or a use case-specific service
 
         logger.debug(f"Offered value-added services: {offered_services}")
 
@@ -793,6 +802,9 @@ class ChargeParameterDiscovery(StateEVCC):
             #      if e.g. EVSENotification is set to STOP_CHARGING or if RCD
             #      is True. But let's do that after the testival
 
+            if self.comm_session.service_hpc1_active:
+                if len(charge_params_res.sa_schedule_list) > 2:
+                    charge_params_res.sa_schedule_list = charge_params_res.sa_schedule_list[:2]  # [V2G2-PnC-CharIN-017]
             (
                 charge_progress,
                 schedule_id,
@@ -1213,7 +1225,7 @@ class ChargingStatus(StateEVCC):
                     f"MeteringReceiptReq: {exc}"
                 )
                 return
-        elif ac_evse_status.evse_notification == EVSENotification.RE_NEGOTIATION:
+        elif ac_evse_status.evse_notification == EVSENotification.RE_NEGOTIATION and not self.comm_session.service_hpc1_active:
             self.comm_session.renegotiation_requested = True
             power_delivery_req = PowerDeliveryReq(
                 charge_progress=ChargeProgress.RENEGOTIATE,

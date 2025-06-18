@@ -144,6 +144,7 @@ class EVCCCommunicationSession(V2GCommunicationSession):
         self.is_tls = False
 
         self.sae_j2847_active: int = 0
+        self.service_hpc1_active: bool = False
 
     def create_sap(self) -> Union[SupportedAppProtocolReq, None]:
         """
