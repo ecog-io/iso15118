@@ -2,7 +2,7 @@ import logging
 from abc import ABC
 from typing import Optional, Tuple, Type
 
-from pydantic import Field, root_validator, validator
+from pydantic.v1 import Field, root_validator, validator
 
 from iso15118.shared.exceptions import V2GMessageValidationError
 from iso15118.shared.messages import BaseModel

@@ -15,7 +15,7 @@ from abc import ABC
 from enum import Enum
 from typing import List, Optional, Union
 
-from pydantic import Field, conbytes, conint, constr, validator
+from pydantic.v1 import Field, conbytes, conint, constr, validator
 from typing_extensions import TypeAlias
 
 from iso15118.shared.messages import BaseModel

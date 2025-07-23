@@ -14,7 +14,7 @@ element names by using the 'alias' attribute.
 from enum import Enum, IntEnum
 from typing import List
 
-from pydantic import Field, conbytes, root_validator
+from pydantic.v1 import Field, conbytes, root_validator
 
 from iso15118.shared.messages import BaseModel
 from iso15118.shared.messages.datatypes import (
