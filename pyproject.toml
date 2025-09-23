@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "iso15118"
-version = "0.31.0"
+version = "0.31.1"
 description = "Implementation of DIN SPEC 70121, ISO 15118-2 and -20 specs for SECC"
 authors = [
     "André Duarte <andre@ecog.io>",
