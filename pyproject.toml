@@ -35,7 +35,7 @@ flake8 = ">=4.0.1,<7.2.0"
 pytest-cov = ">=3,<7"
 aiofile = "^3.7.4"
 toml = "^0.10.2"
-mypy = "^1.14.1"
+mypy = "1.5.1"
 
 [tool.isort]
 profile = "black"
