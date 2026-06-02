@@ -12,7 +12,7 @@ from abc import ABC, abstractmethod
 from asyncio.streams import StreamReader, StreamWriter
 from typing import List, Optional, Tuple, Type, Union
 
-from pydantic import ValidationError
+from pydantic.v1 import ValidationError
 from typing_extensions import TYPE_CHECKING
 
 from iso15118.shared.exceptions import (

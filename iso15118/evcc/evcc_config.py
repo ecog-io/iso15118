@@ -3,7 +3,7 @@ import logging
 from typing import List, Optional
 
 from aiofile import async_open
-from pydantic import BaseModel, Field, validator
+from pydantic.v1 import BaseModel, Field, validator
 
 from iso15118.shared.messages.enums import (
     UINT_16_MAX,

@@ -11,7 +11,7 @@ Pydantic's Field class is used to be able to create a json schema of each model
 element names by using the 'alias' attribute.
 """
 
-from pydantic import Field, root_validator
+from pydantic.v1 import Field, root_validator
 
 from iso15118.shared.exceptions import V2GMessageValidationError
 from iso15118.shared.messages import BaseModel
