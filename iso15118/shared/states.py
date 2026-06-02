@@ -3,7 +3,7 @@ import logging
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Optional, Type, Union
 
-from pydantic import ValidationError
+from pydantic.v1 import ValidationError
 
 from iso15118.shared.exceptions import (
     EXIEncodingError,

@@ -1,7 +1,7 @@
 from enum import Enum
 from typing import List, Literal, Tuple, Union
 
-from pydantic import Field, root_validator
+from pydantic.v1 import Field, root_validator
 
 from iso15118.shared.messages import BaseModel
 from iso15118.shared.messages.enums import (

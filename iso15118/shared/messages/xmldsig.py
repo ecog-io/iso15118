@@ -8,7 +8,7 @@ https://www.w3.org/TR/xmldsig-core1/
 
 from typing import List
 
-from pydantic import Field, HttpUrl
+from pydantic.v1 import Field, HttpUrl
 
 from iso15118.shared.messages import BaseModel
 

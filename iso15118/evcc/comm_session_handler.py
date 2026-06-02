@@ -13,7 +13,7 @@ from asyncio.streams import StreamReader, StreamWriter
 from ipaddress import IPv6Address
 from typing import Coroutine, List, Optional, Tuple, Union
 
-from pydantic.error_wrappers import ValidationError
+from pydantic.v1.error_wrappers import ValidationError
 
 from iso15118.evcc.controller.interface import EVControllerInterface
 from iso15118.evcc.evcc_config import EVCCConfig

@@ -3,7 +3,7 @@ import logging
 from base64 import b64decode, b64encode
 from typing import Optional, Type, Union
 
-from pydantic import ValidationError
+from pydantic.v1 import ValidationError
 
 from iso15118.shared.exceptions import (
     EXIDecodingError,
