@@ -7,7 +7,7 @@ from typing import Optional, Tuple
 
 from iso15118.shared.messages.timeouts import Timeouts
 from iso15118.shared.messages.v2gtp import V2GTPMessage
-from iso15118.shared.network import SDP_MULTICAST_GROUP, SDP_SERVER_PORT
+from iso15118.shared.network import SDP_MULTICAST_GROUP, SDP_SERVER_PORT, _get_link_local_addr
 from iso15118.shared.notifications import (
     ReceiveTimeoutNotification,
     UDPPacketNotification,
@@ -66,6 +66,16 @@ class UDPClient(DatagramProtocol):
         # interface(s) the socket receives multicast packets from.
         interface_index = socket.if_nametoindex(iface)
         sock.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_MULTICAST_IF, interface_index)
+
+        # Bind to the interface's link-local address on an ephemeral port so
+        # the kernel delivers unicast SDP responses back to this socket.
+        # Without an explicit bind(), the socket only auto-binds on first
+        # sendto(), and on Linux the unbound socket may not receive the unicast
+        # reply because it isn't anchored to the interface. Using the
+        # link-local address + scope_id avoids needing CAP_NET_RAW
+        # (required by SO_BINDTODEVICE) while still anchoring to the NIC.
+        link_local_addr = _get_link_local_addr(iface)
+        sock.bind((str(link_local_addr), 0, 0, interface_index))
 
         return sock
 
