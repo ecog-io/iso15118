@@ -3,7 +3,7 @@ name: PR Python 🐍 to Switch Repo
 on:
   pull_request:
     branches:
-      - master
+      - main
 
 env:
   PYTHON_VERSION: 3.10.5
