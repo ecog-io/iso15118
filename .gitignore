@@ -116,3 +116,5 @@ venv.bak/
 iso15118/shared/pki/iso15118_2
 iso15118/shared/pki/iso15118_20
 /iso15118/shared/pki/pki-ext/
+iso15118/shared/pki/index.txt*
+iso15118/shared/pki/serial*
