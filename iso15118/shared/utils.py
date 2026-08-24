@@ -125,4 +125,7 @@ async def wait_for_tasks(
         try:
             done_task.result()
         except Exception as e:
-            logger.exception(e)
+            # We don't want to log CancelledError as an exception
+            if not isinstance(e, asyncio.CancelledError):
+                logger.exception(e)
+            raise e

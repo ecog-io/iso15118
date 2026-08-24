@@ -676,6 +676,7 @@ class EVControllerInterface(ABC):
 
         Relevant for
         - DIN SPEC 70121
+        - ISO 15118-2
         """
         raise NotImplementedError
 
