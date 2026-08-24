@@ -322,7 +322,7 @@ class PVRemainingTimeToBulkSOC(PhysicalValue):
     Table 68 shows a max value of 172800 for RemainingTimeToBulkSOC.
     """
 
-    unit: Literal[UnitSymbol.SECONDS] = Field(..., alias="Unit")
+    unit: Literal[UnitSymbol.SECONDS, UnitSymbol.MINUTES] = Field(..., alias="Unit")
 
 
 class PVRemainingTimeToFullSOC(PhysicalValue):
@@ -332,7 +332,7 @@ class PVRemainingTimeToFullSOC(PhysicalValue):
     Table 68 shows a max value of 172800 for RemainingTimeToFullSOC.
     """
 
-    unit: Literal[UnitSymbol.SECONDS] = Field(..., alias="Unit")
+    unit: Literal[UnitSymbol.SECONDS, UnitSymbol.MINUTES] = Field(..., alias="Unit")
 
 
 class PVStartValue(PhysicalValue):
@@ -525,7 +525,7 @@ class PVRemainingTimeToFullSOCDin(PVRemainingTimeToFullSOC):
     In DIN the Element unit is optional, in ISO it is mandatory.
     """
 
-    unit: Literal[UnitSymbol.SECONDS] = Field(None, alias="Unit")
+    unit: Literal[UnitSymbol.SECONDS, UnitSymbol.MINUTES] = Field(None, alias="Unit")
 
 
 class PVRemainingTimeToBulkSOCDin(PVRemainingTimeToBulkSOC):
@@ -535,7 +535,7 @@ class PVRemainingTimeToBulkSOCDin(PVRemainingTimeToBulkSOC):
     In DIN the Element unit is optional, in ISO it is mandatory.
     """
 
-    unit: Literal[UnitSymbol.SECONDS] = Field(None, alias="Unit")
+    unit: Literal[UnitSymbol.SECONDS, UnitSymbol.MINUTES] = Field(None, alias="Unit")
 
 
 class DCEVChargeParams(BaseModel):
