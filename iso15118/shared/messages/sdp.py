@@ -12,7 +12,7 @@ from iso15118.shared.messages.enums import (
 
 logger = logging.getLogger(__name__)
 
-MIN_TCP_PORT = 49152
+MIN_TCP_PORT = 1025
 MAX_TCP_PORT = 65535
 
 
