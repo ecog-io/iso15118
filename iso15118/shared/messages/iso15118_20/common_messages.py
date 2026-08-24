@@ -710,30 +710,6 @@ class ChargingSchedule(BaseModel):
         None, alias="AbsolutePriceSchedule"
     )
 
-    @root_validator(pre=True)
-    def either_price_levels_or_absolute_prices(cls, values):
-        """
-        Either price_level_schedule or absolute_price_schedule must be set,
-        depending on whether abstract price levels or absolute prices are used
-        to indicate costs for the charging session.
-
-        Pydantic validators are "class methods",
-        see https://pydantic-docs.helpmanual.io/usage/validators/
-        """
-        # pylint: disable=no-self-argument
-        # pylint: disable=no-self-use
-        if one_field_must_be_set(
-            [
-                "price_level_schedule",
-                "PriceLevelSchedule",
-                "absolute_price_schedule",
-                "AbsolutePriceSchedule",
-            ],
-            values,
-            True,
-        ):
-            return values
-
 
 class DischargingSchedule(BaseModel):
     """See section 8.3.5.3.40 in ISO 15118-20"""
@@ -746,30 +722,6 @@ class DischargingSchedule(BaseModel):
 
     # TODO Need to add a root validator to check if power schedule entries are negative
     #      for discharging (also heck other discharging fields in other types)
-
-    @root_validator(pre=True)
-    def either_price_levels_or_absolute_prices(cls, values):
-        """
-        Either price_level_schedule or absolute_price_schedule must be set,
-        depending on abstract price levels or absolute prices are used to
-        indicate costs for the charging session.
-
-        Pydantic validators are "class methods",
-        see https://pydantic-docs.helpmanual.io/usage/validators/
-        """
-        # pylint: disable=no-self-argument
-        # pylint: disable=no-self-use
-        if one_field_must_be_set(
-            [
-                "price_level_schedule",
-                "PriceLevelSchedule",
-                "absolute_price_schedule",
-                "AbsolutePriceSchedule",
-            ],
-            values,
-            True,
-        ):
-            return values
 
 
 class ScheduleTuple(BaseModel):
