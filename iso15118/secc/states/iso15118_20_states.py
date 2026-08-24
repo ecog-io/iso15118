@@ -7,6 +7,8 @@ SessionStopReq.
 import asyncio
 import logging
 import time
+import base64
+
 from typing import List, Optional, Tuple, Type, Union, cast
 
 from iso15118.secc.comm_session_handler import SECCCommunicationSession
@@ -80,6 +82,11 @@ from iso15118.shared.messages.iso15118_20.common_messages import (
     SessionSetupRes,
     SessionStopReq,
     SessionStopRes,
+    ContractCertificateChain,
+    SignedInstallationData,
+    SubCertificates,
+    CertificateChain,
+    ECDHCurve,
 )
 from iso15118.shared.messages.iso15118_20.common_types import (
     EVSEStatus,
@@ -108,8 +115,36 @@ from iso15118.shared.messages.iso15118_20.dc import (
 )
 from iso15118.shared.messages.iso15118_20.timeouts import Timeouts
 from iso15118.shared.notifications import StopNotification
-from iso15118.shared.security import get_random_bytes, verify_signature
-from iso15118.shared.states import State, Terminate
+from iso15118.shared.states import Base64, Pause, State, Terminate
+from iso15118.shared.messages.xmldsig import Signature
+from iso15118.shared.security import (
+    CertPath,
+    KeyEncoding,
+    KeyPasswordPath,
+    KeyPath,
+    build_pem_certificate_chain,
+    create_signature,
+    encrypt_priv_key,
+    get_cert_cn,
+    get_certificate_hash_data,
+    get_random_bytes,
+    load_cert,
+    load_priv_key,
+    log_certs_details,
+    verify_certs,
+    verify_signature,
+)
+
+from iso15118.shared.exceptions import (
+    CertAttributeError,
+    CertChainLengthError,
+    CertExpiredError,
+    CertNotYetValidError,
+    CertRevokedError,
+    CertSignatureError,
+    EncryptionError,
+    PrivateKeyReadError,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -320,9 +355,218 @@ class CertificateInstallation(StateSECC):
         ],
         message_exi: bytes = None,
     ):
-        raise NotImplementedError("CertificateInstallation not yet implemented")
+        msg = self.check_msg_v20(message, [CertificateInstallationReq])
+        if not msg:
+            return
 
+        if not self.validate_message_signature(msg):
+            self.stop_state_machine(
+                "Signature verification failed for " "CertificateInstallationReq",
+                message,
+                ResponseCode.FAILED_SIGNATURE_ERROR,
+            )
+            return
 
+        # In a real world scenario we need to fetch the certificate from the backend.
+        # We call get_15118_ev_certificate method, which would be a direct mapping
+        # to the Get15118EVCertificateRequest
+        # message from OCPP 2.0.1 for the installation case.
+        # This accepts 2 arguments:
+        # 1. The raw EXI CertificateInstallationReq message coming from the EV
+        # in base64 encoded form.
+        # 2. A string that specifies `15118SchemaVersion` which would be either of
+        # "urn:iso:15118:2:2013:MsgDef" or "urn:iso:std:iso:15118:-20:CommonMessages"
+        signature = None
+
+        try:
+            if self.comm_session.config.use_cpo_backend:
+                logger.info("Using CPO backend to fetch CertificateInstallationRes")
+                # CertificateInstallationReq must be base64 encoded before forwarding
+                # to backend.
+                # Call to b64encode returns byte[] - hence the .decode("utf-8")
+                base64_certificate_install_req = base64.b64encode(message_exi).decode(
+                    "utf-8"
+                )
+
+                # The response received below is EXI response in base64 encoded form.
+                # Decoding to EXI happens later just before V2GTP packet is built.
+                base64_certificate_installation_res = (
+                    await self.comm_session.evse_controller.get_15118_ev_certificate(
+                        base64_certificate_install_req, Namespace.ISO_V2_MSG_DEF
+                    )
+                )
+                certificate_installation_res: Union[
+                    CertificateInstallationRes, Base64
+                ] = Base64(
+                    message=base64_certificate_installation_res,
+                    message_name=CertificateInstallationRes.__name__,
+                    namespace=Namespace.ISO_V2_MSG_DEF,
+                )
+            else:
+                (
+                    certificate_installation_res,
+                    signature,
+                ) = self.generate_certificate_installation_res()
+
+        except Exception as e:
+            error = f"Error building CertificateInstallationRes: {e}"
+            logger.error(error)
+            self.stop_state_machine(
+                error,
+                message,
+                ResponseCode.FAILED_NO_CERTIFICATE_AVAILABLE,
+            )
+            return
+            
+        print("^^^^^^^^^^FullCertInstallationREs^^^^^^^^^^^^^^")
+        print("\n")
+        EXI().to_exi(certificate_installation_res, Namespace.ISO_V20_COMMON_MSG)
+        print("\n")
+        print("^^^^^^^^^^Signature ^^^^^^^^^^^^^^")
+        print(signature)
+        
+        self.create_next_message(
+            None,
+            certificate_installation_res,
+            Timeouts.V2G_SECC_SEQUENCE_TIMEOUT,
+            Namespace.ISO_V20_COMMON_MSG,
+            ISOV20PayloadTypes.MAINSTREAM,
+            signature=signature,
+        )
+
+    def validate_message_signature(self, message: V2GMessageV20) -> bool:
+        # For the CertificateInstallation, the min. the SECC can do is
+        # to verify the message signature, using the OEM provisioning
+        # certificate (public key) - this is available in the cert installation req.
+        # The chain of signatures, from the signature in the
+        # CertificateInstallationReq's header all the way to the
+        # self-signed OEM/V2G root certificate, can be verified if the
+        # OEM Sub-CA and OEM/V2G root CA certificate are available.
+
+        cert_install_req: CertificateInstallationReq = cast(CertificateInstallationReq, message)
+        sub_ca_certificates_oem = None
+        root_ca_certificate_oem = None
+
+        try:
+            sub_ca_certificates_oem = [
+                cert_install_req.oem_prov_cert_chain.sub_certificates,
+            ]
+            root_ca_certificate_oem = load_cert(CertPath.OEM_ROOT_DER)
+        except (FileNotFoundError, IOError):
+            pass
+
+        return verify_signature(
+            signature=cert_install_req.header.signature,
+            elements_to_sign=[
+                (
+                    cert_install_req.oem_prov_cert_chain.id,
+                    EXI().to_exi(cert_install_req.oem_prov_cert_chain, Namespace.ISO_V20_COMMON_MSG),
+                )
+            ],
+            leaf_cert=cert_install_req.oem_prov_cert_chain.certificate,
+            sub_ca_certs=sub_ca_certificates_oem,
+            root_ca_cert=root_ca_certificate_oem,
+        )
+
+    def generate_certificate_installation_res(
+        self,
+    ) -> Tuple[CertificateInstallationRes, Signature]:
+        try:
+            dh_pub_key, encrypted_priv_key_bytes = encrypt_priv_key(
+                oem_prov_cert=load_cert(CertPath.OEM_LEAF_DER),
+                priv_key_to_encrypt=load_priv_key(
+                    KeyPath.CONTRACT_LEAF_PEM,
+                    KeyEncoding.PEM,
+                    KeyPasswordPath.CONTRACT_LEAF_KEY_PASSWORD,
+                ),
+            )
+        except EncryptionError:
+            raise EncryptionError(
+                "EncryptionError while trying to encrypt the "
+                "private key for the contract certificate"
+            )
+        except PrivateKeyReadError as exc:
+            raise PrivateKeyReadError(
+                f"Can't read private key to encrypt for "
+                f"CertificateInstallationRes: {exc}"
+            )
+        
+        
+        contract_cert_chain = ContractCertificateChain(
+            certificate=load_cert(CertPath.CONTRACT_LEAF_DER),  
+            sub_certificates=SubCertificates(
+                certificates=[
+                    load_cert(CertPath.MO_SUB_CA2_DER),  
+                    load_cert(CertPath.MO_SUB_CA1_DER), 
+                ]
+            ),
+        )
+      
+        signed_installation_data = SignedInstallationData(
+            id="id1",
+            contract_cert_chain=contract_cert_chain,
+            ecdh_curve= ECDHCurve.secp_521,  
+            dh_public_key=dh_pub_key,
+            secp521_encrypted_private_key=encrypted_priv_key_bytes,  
+        )
+        
+
+        cps_certificate_chain = CertificateChain(
+            certificate=load_cert(CertPath.CPS_LEAF_DER),  # convert to bytes
+            sub_certificates=SubCertificates(
+                certificates=[
+                    load_cert(CertPath.CPS_SUB_CA2_DER),  # convert to bytes
+                    load_cert(CertPath.CPS_SUB_CA1_DER),  # convert to bytes
+                ]
+            ),
+        )
+        
+     
+
+        cert_install_res = CertificateInstallationRes(
+            header = MessageHeader(
+                session_id = self.comm_session.session_id, timestamp = time.time()
+            ),
+            response_code=ResponseCode.OK,
+            evse_processing=Processing.FINISHED,  # replace with actual Processing
+            cps_certificate_chain=cps_certificate_chain,
+            signed_installation_data=signed_installation_data,
+            remaining_contract_cert_chains=0,  # replace with actual remaining contract cert chains
+        )
+        
+        try:
+    
+            # Elements to sign, containing its id and the exi encoded stream
+            signed_installation_data_tuple = (
+                cert_install_res.signed_installation_data.id,
+                EXI().to_exi(
+                    cert_install_res.signed_installation_data, Namespace.ISO_V20_COMMON_MSG
+                ),
+            )
+
+            elements_to_sign = [
+                signed_installation_data_tuple,
+            ]
+
+            # The private key to be used for the signature
+            signature_key = load_priv_key(
+                KeyPath.CPS_LEAF_PEM,
+                KeyEncoding.PEM,
+                KeyPasswordPath.CPS_LEAF_KEY_PASSWORD,
+            )
+
+            print("#################################################################")
+            signature = create_signature(elements_to_sign, signature_key)
+
+        except PrivateKeyReadError as exc:
+            raise PrivateKeyReadError(
+                "Can't read private key needed to create signature "
+                f"for CertificateInstallationRes: {exc}",
+                ResponseCode.FAILED,
+            )
+
+        return cert_install_res, signature
+    
 class Authorization(StateSECC):
     """
     The ISO 15118-20 state in which the SECC processes an AuthorizationReq

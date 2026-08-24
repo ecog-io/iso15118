@@ -1174,6 +1174,11 @@ class SignedInstallationData(BaseModel):
         ):
             return values
 
+    def __str__(self):
+        # We need to sign this element, which means it will be EXI encoded and we need
+        # its XSD-conform name
+        return "SignedInstallationData"
+
 
 class CertificateInstallationRes(V2GResponse):
     """See section 8.3.4.3.9.3 in ISO 15118-20"""
