@@ -1,0 +1,38 @@
+name: CI gate
+
+# Provides one status check named `ci`, on every pull request, in every
+# first-party repo in both orgs. The org ruleset for rule 15 requires that name,
+# so the name is the contract: keep the job id `ci` and keep it unconditional.
+#
+# WHY THIS FILE EXISTS SEPARATELY FROM ci.yml
+# 48 repos already had a ci.yml with real pipelines in it. Writing to that path
+# would have overwritten working CI, so the gate lives in its own file and no
+# existing workflow was touched.
+#
+# WHAT IT CURRENTLY PROVES: nothing. It passes unconditionally. It exists so the
+# ruleset has a name to require in every repo, which is what lets rule 15 be
+# enabled at all - a required check that never reports does not fail a pull
+# request, it blocks it forever, and 51 repos here have no CI whatsoever.
+#
+# HOW TO MAKE IT MEAN SOMETHING, per repo:
+#   - add `needs: [<your real jobs>]` to the `ci` job, so it goes red when they
+#     do, or
+#   - replace the placeholder step with the repo's actual lint/test command.
+# Do NOT add `if:` to the `ci` job and do NOT add `paths:` filters to this
+# workflow. Either one stops the check reporting on some pull requests, and a
+# required check that never reports makes those pull requests unmergeable.
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Placeholder
+        run: |
+          echo "No repository-specific checks are wired into this gate yet."
+          echo "See the comment at the top of .github/workflows/ci-gate.yml."
