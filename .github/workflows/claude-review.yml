@@ -1,0 +1,141 @@
+name: Claude Code Review
+
+# Advisory code review by Claude on every pull request. Pilot scope: this repo only.
+#
+# ADVISORY, NOT BLOCKING. No required status check, so neither a finding nor a Vertex
+# outage can stop a merge. capo's main still requires `ci` and one approval.
+#
+# HOW THE REVIEW ACTUALLY REACHES THE PR
+# Claude posts the comment ITSELF, using tools, and it can only use tools that
+# --allowedTools grants. The prompt must also tell it to post rather than reply in
+# chat. Two earlier attempts here failed for exactly this reason: run 33164828600
+# analysed the diff fine on Vertex (16 turns, is_error false) and then reported
+# permission_denials_count: 8 and posted nothing, because no tools were allowed.
+# Shape below follows docs/solutions.md "Automatic PR Code Review".
+#
+# WHY NO `synchronize` TRIGGER
+# One review per pull request, not one per push. The documented example uses
+# [opened, synchronize]; this deliberately does not, because capo sees ~15 PRs a month
+# and the fleet ~420, and per-push review multiplies spend. Re-review on demand by
+# commenting @claude.
+#
+# AUTH: Vertex via Workload Identity Federation, no long-lived key. Proven end to end
+# 2026-08-28. Provider scoped to attribute.repository == 'ecog-gmbh/capo'; the service
+# account holds roles/aiplatform.user and nothing else.
+#
+# COST: model pinned via vars.VERTEX_CLAUDE_MODEL, currently claude-opus-5@default.
+# The last step records per-run figures. Treat total_cost_usd as an ESTIMATE from
+# Claude Code's own Anthropic price table, NOT a Vertex bill: actual charges are
+# Google's, visible only in Cloud Billing for operational-data-452311, and this project
+# also bills Gemini usage, so group by SKU to separate them.
+#
+# ITERATION COST: the action refuses to run a review workflow whose content differs
+# from the copy on the default branch, so every change here must reach main first.
+
+on:
+  pull_request:
+    types: [opened, reopened, ready_for_review]
+
+permissions:
+  contents: read
+  pull-requests: write
+  id-token: write        # required for OIDC to Google Cloud
+
+jobs:
+  claude-review:
+    if: github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_VERTEX_SERVICE_ACCOUNT }}
+
+      - name: Run Claude Code Review
+        id: claude-review
+        uses: anthropics/claude-code-action@v1
+        env:
+          # google-github-actions/auth exports GOOGLE_APPLICATION_CREDENTIALS, which
+          # takes precedence over ANTHROPIC_VERTEX_PROJECT_ID. Both set so the project
+          # is unambiguous either way.
+          ANTHROPIC_VERTEX_PROJECT_ID: ${{ vars.ANTHROPIC_VERTEX_PROJECT_ID }}
+          CLOUD_ML_REGION: ${{ vars.CLOUD_ML_REGION }}
+        with:
+          use_vertex: "true"
+          # Consolidates output into one comment per PR instead of a new one each run.
+          use_sticky_comment: "true"
+          prompt: |
+            REPO: ${{ github.repository }}
+            PR NUMBER: ${{ github.event.pull_request.number }}
+
+            Review this pull request against the EcoG review standard
+            (claude-code-setup/claude.md/strict-reviewer):
+
+            - Tag every finding [P0] to [P3]. [P0] blocks merge, something breaks in
+              production. [P1] fix before merge. [P2] follow-up tech debt. [P3] note
+              or preference.
+            - Security findings are always [P0] or [P1]. No exceptions.
+            - Always check: injection vectors, missing auth checks, unvalidated input,
+              hardcoded secrets, error messages leaking internals, off-by-one, wrong
+              conditional logic, unhandled edge cases, race conditions, missing test
+              coverage for changed behaviour, assertions that cannot fail, n+1
+              queries, unbounded loops, swallowed errors.
+            - No praise. No "looks good otherwise". No summary of what the PR does.
+            - If you find nothing, post exactly: No findings.
+
+            Note: the PR branch is already checked out in the working directory.
+
+            Use `gh pr comment` for top-level feedback.
+            Use `mcp__github_inline_comment__create_inline_comment` (with
+            `confirmed: true`) to flag specific lines.
+            Only post GitHub comments. Do not submit review text as a chat message,
+            it will be discarded.
+          claude_args: |
+            --model ${{ vars.VERTEX_CLAUDE_MODEL }}
+            --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*)"
+
+      # Per-run consumption into the job summary. See the COST note above: this is an
+      # estimate, not the Vertex bill.
+      - name: Record consumption (estimate)
+        if: always()
+        run: |
+          F=$(find /home/runner/work/_temp -name 'claude-execution-output.json' 2>/dev/null | head -1)
+          if [ -z "$F" ]; then
+            echo "No execution output found." >> "$GITHUB_STEP_SUMMARY"; exit 0
+          fi
+          python3 - "$F" <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import json, sys
+          # The execution output is a pretty-printed JSON array, not JSONL. Parse the
+          # whole file; fall back to line-by-line in case that ever changes.
+          raw = open(sys.argv[1]).read()
+          try:
+              data = json.loads(raw)
+          except json.JSONDecodeError:
+              data = [json.loads(l) for l in raw.splitlines() if l.strip().startswith('{')]
+          if isinstance(data, dict):
+              data = [data]
+          res = [o for o in data if isinstance(o, dict) and o.get('type') == 'result']
+          if not res:
+              print('### Claude review\n\nNo `result` record in the execution output.'); raise SystemExit
+          r = res[-1]
+          c = r.get('total_cost_usd')
+          print('### Claude review consumption\n')
+          print('| metric | value |\n|---|---|')
+          print(f"| model | `{next(iter(r.get('modelUsage') or {'unknown': 0}))}` |")
+          print(f"| cost estimate (USD) | {c:.4f} |" if isinstance(c, (int, float)) else "| cost estimate (USD) | unknown |")
+          print(f"| turns | {r.get('num_turns','?')} |")
+          print(f"| duration | {round((r.get('duration_ms') or 0)/1000, 1)}s |")
+          print(f"| errored | {r.get('is_error')} |")
+          print(f"| permission denials | {r.get('permission_denials_count','?')} |")
+          print('\nCost is Claude Code\'s own estimate from Anthropic list prices, **not** the')
+          print('Vertex bill. Actual charges are in Cloud Billing for `operational-data-452311`;')
+          print('group by SKU, since Gemini also bills there.')
+          print('\n**Permission denials above zero mean Claude was blocked from tools it tried to')
+          print('use** — most likely posting. Check `--allowedTools` before trusting a silent run.')
+          PY
