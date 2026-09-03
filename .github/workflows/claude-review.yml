@@ -35,6 +35,21 @@ name: Claude Code Review
 on:
   pull_request:
     types: [opened, reopened, ready_for_review]
+    # A skipped run is the only thing that touches the cache-WRITE cost, which is a
+    # cold-start premium paid once per run regardless of diff size. It was 31% of the
+    # week to 2026-09-03, so not running at all beats running cheaply.
+    paths-ignore:
+      - '**/*.md'
+      - 'docs/**'
+      - 'vendor/**'
+      - 'third_party/**'
+      - '**/*.lock'
+      - '**/package-lock.json'
+      - '**/poetry.lock'
+      - '**/Cargo.lock'
+      - '**/go.sum'
+      - '.gitignore'
+      - 'LICENSE'
 
 permissions:
   contents: read
@@ -43,7 +58,12 @@ permissions:
 
 jobs:
   claude-review:
-    if: github.event.pull_request.draft == false
+    # Bots were 18% of PR volume. A dependabot bump paid for a full review nobody
+    # reads, cold-cache premium included.
+    if: >-
+      github.event.pull_request.draft == false &&
+      github.event.pull_request.user.type != 'Bot' &&
+      !startsWith(github.event.pull_request.user.login, 'dependabot')
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
