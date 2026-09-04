@@ -710,7 +710,7 @@ class SimEVSEController(EVSEControllerInterface):
         return MeterInfoV20(
             meter_id="Switch-Meter-123",
             charged_energy_reading_wh=10,
-            meter_timestamp=time.time(),
+            meter_timestamp=int(time.time() * 1_000_000),
         )
 
     async def get_supported_providers(self) -> Optional[List[ProviderID]]:
