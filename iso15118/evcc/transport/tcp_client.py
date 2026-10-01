@@ -50,6 +50,7 @@ class TCPClient(asyncio.Protocol):
                 port=port,
                 family=socket.AF_INET6,
                 ssl=self.ssl_context,
+                server_hostname='' if self.ssl_context else None,
             )
         except ConnectionRefusedError as exc:
             raise exc
