@@ -54,6 +54,7 @@ from iso15118.shared.messages.iso15118_20.common_messages import (
     SessionSetupRes,
     SessionStopReq,
     SessionStopRes,
+    SignedInstallationData,
 )
 from iso15118.shared.messages.iso15118_20.common_types import V2GMessage
 from iso15118.shared.messages.iso15118_20.common_types import (
@@ -234,6 +235,8 @@ class EXI:
                 msg_element, V2GMessageDINSPEC
             ):
                 message_dict = {"V2G_Message": msg_to_dct}
+            elif isinstance(msg_element, SignedInstallationData):
+                message_dict = {"SignedInstallationData": msg_to_dct}
             else:
                 message_dict = {str(msg_element): msg_to_dct}
 
@@ -244,7 +247,7 @@ class EXI:
                                    {exc}"
             ) from exc
 
-        if shared_settings[SettingKey.MESSAGE_LOG_JSON]:
+        if shared_settings[SettingKey.MESSAGE_LOG_EXI]:
             logger.info(f"Message to encode (ns={protocol_ns}): {msg_content}")
 
         try:

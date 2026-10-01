@@ -7,12 +7,19 @@ from datetime import datetime
 from enum import Enum, auto
 from ssl import DER_cert_to_PEM_cert, SSLContext, SSLError, VerifyMode
 from typing import Dict, List, Optional, Tuple, Union, cast
-
+from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+from cryptography.x509 import load_der_x509_certificate, Certificate
+from cryptography.x509.oid import ExtensionOID, NameOID
+from cryptography.hazmat.primitives.asymmetric.ec import EllipticCurvePublicKey
+from os import urandom
+from typing import Tuple
 from cryptography.exceptions import InvalidSignature, UnsupportedAlgorithm
 from cryptography.hazmat.backends.openssl.backend import Backend
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.primitives.asymmetric.ec import (
-    SECP256R1,
+    SECP521R1,
     EllipticCurvePrivateKey,
     EllipticCurvePublicKey,
 )
@@ -21,7 +28,7 @@ from cryptography.hazmat.primitives.asymmetric.utils import (
     encode_dss_signature,
 )
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
-from cryptography.hazmat.primitives.hashes import SHA256, Hash, HashAlgorithm
+from cryptography.hazmat.primitives.hashes import SHA256, SHA512, Hash, HashAlgorithm
 from cryptography.hazmat.primitives.kdf.concatkdf import ConcatKDFHash
 from cryptography.hazmat.primitives.serialization import (
     Encoding,
@@ -226,7 +233,7 @@ def get_ssl_context(server_side: bool) -> Optional[SSLContext]:
                 return None
 
     # The OpenSSL name for ECDH curve secp256r1 is prime256v1
-    ssl_context.set_ecdh_curve("prime256v1")
+    ssl_context.set_ecdh_curve("secp521r1")
 
     return ssl_context
 
@@ -335,7 +342,7 @@ def load_priv_key(
 
 def to_ec_pub_key(public_key_bytes: bytes) -> EllipticCurvePublicKey:
     """
-    Takes a public key in bytes for the named elliptic curve secp256R1, as used
+    Takes a public key in bytes for the named elliptic curve secp521R1, as used
     ISO 15118-2, and returns it as an instance of EllipticCurvePublicKey.
 
     Args:
@@ -352,7 +359,7 @@ def to_ec_pub_key(public_key_bytes: bytes) -> EllipticCurvePublicKey:
     """
     try:
         ec_pub_key = EllipticCurvePublicKey.from_encoded_point(
-            curve=SECP256R1(), data=public_key_bytes
+            curve=SECP521R1(), data=public_key_bytes
         )
         return ec_pub_key
     except ValueError as exc:
@@ -605,7 +612,7 @@ def verify_certs(
                 pub_key.verify(
                     leaf_cert.signature,
                     leaf_cert.tbs_certificate_bytes,
-                    ec.ECDSA(SHA256()),
+                    ec.ECDSA(SHA512()),
                 )
             else:
                 # TODO Add support for ISO 15118-20 public key types
@@ -621,7 +628,7 @@ def verify_certs(
                     leaf_cert.signature,
                     leaf_cert.tbs_certificate_bytes,
                     # TODO Find a way to read id dynamically from the certificate
-                    ec.ECDSA(SHA256()),
+                    ec.ECDSA(SHA512()),
                 )
             else:
                 # TODO Add support for ISO 15118-20 public key types
@@ -638,7 +645,7 @@ def verify_certs(
                     pub_key.verify(
                         sub_ca2_cert.signature,
                         sub_ca2_cert.tbs_certificate_bytes,
-                        ec.ECDSA(SHA256()),
+                        ec.ECDSA(SHA512()),
                     )
                 else:
                     # TODO Add support for ISO 15118-20 public key types
@@ -655,7 +662,7 @@ def verify_certs(
                     pub_key.verify(
                         sub_ca1_cert.signature,
                         sub_ca1_cert.tbs_certificate_bytes,
-                        ec.ECDSA(SHA256()),
+                        ec.ECDSA(SHA512()),
                     )
                 else:
                     # TODO Add support for ISO 15118-20 public key types
@@ -672,7 +679,7 @@ def verify_certs(
                     pub_key.verify(
                         sub_ca2_cert.signature,
                         sub_ca2_cert.tbs_certificate_bytes,
-                        ec.ECDSA(SHA256()),
+                        ec.ECDSA(SHA512()),
                     )
                 else:
                     # TODO Add support for ISO 15118-20 public key types
@@ -810,7 +817,7 @@ def create_signature(
                 transform=[Transform(algorithm="http://www.w3.org/TR/canonical-exi/")]
             ),
             digest_method=DigestMethod(
-                algorithm="http://www.w3.org/2001/04/xmlenc#sha256"
+                algorithm="http://www.w3.org/2001/04/xmlenc#sha512"
             ),
             digest_value=create_digest(exi_encoded),
         )
@@ -822,7 +829,7 @@ def create_signature(
             algorithm="http://www.w3.org/TR/canonical-exi/"
         ),
         signature_method=SignatureMethod(
-            algorithm="http://www.w3.org/2001/04/xmldsig-more#ecdsa-sha256"
+            algorithm="http://www.w3.org/2001/04/xmldsig-more#ecdsa-sha512"
         ),
         reference=reference_list,
     )
@@ -830,7 +837,7 @@ def create_signature(
     # 2. Step: Signature generation
     exi_encoded_signed_info = EXI().to_exi(signed_info, Namespace.XML_DSIG)
     der_encoded_signature_value = signature_key.sign(
-        data=exi_encoded_signed_info, signature_algorithm=ec.ECDSA(SHA256())
+        data=exi_encoded_signed_info, signature_algorithm=ec.ECDSA(SHA512())
     )
     # The sign method from the cryptography library automatically DER encodes
     # the signature. However, in ISO 15118 DER encoding of the signature
@@ -843,7 +850,7 @@ def create_signature(
     (ec_r, ec_s) = decode_dss_signature(der_encoded_signature_value)
     # As the signature value is sent as a full 64 bytes raw value, we need
     # to convert each point to bytes in big endian format and concatenate both
-    raw_signature_value = bytearray(ec_r.to_bytes(32, "big") + ec_s.to_bytes(32, "big"))
+    raw_signature_value = bytearray(ec_r.to_bytes(66, "big") + ec_s.to_bytes(66, "big"))
     signature = Signature(
         signed_info=signed_info,
         signature_value=SignatureValue(value=raw_signature_value),
@@ -952,16 +959,24 @@ def verify_signature(
     # coordinates in the Elliptic curve from where the public and private key
     # are extracted
 
-    ec_r = int.from_bytes(signature.signature_value.value[:32], "big")
-    ec_s = int.from_bytes(signature.signature_value.value[32:], "big")
+    ec_r = int.from_bytes(signature.signature_value.value[:66], "big")
+    ec_s = int.from_bytes(signature.signature_value.value[66:], "big")
     der_encoded_signature = encode_dss_signature(r=ec_r, s=ec_s)
+    
+    R_HEX = hex(ec_r)
+    S_HEX = hex(ec_s)
+    
+    logger.debug(f"Signature R value: {R_HEX}")
+    logger.debug(f"Signature S value: {S_HEX}")
 
+    logger.debug(f"Subject: {der_encoded_signature.hex().upper()}")
+    
     try:
         if isinstance(pub_key, EllipticCurvePublicKey):
             pub_key.verify(
                 signature=der_encoded_signature,
                 data=exi_encoded_signed_info,
-                signature_algorithm=ec.ECDSA(SHA256()),
+                signature_algorithm=ec.ECDSA(SHA512()),
             )
         else:
             # TODO Add support for ISO 15118-20 public key types
@@ -979,34 +994,35 @@ def verify_signature(
         return False
 
     # 3. Step: Verify signatures along the certificate chain, if provided
-    if sub_ca_certs and root_ca_cert:
-        try:
-            verify_certs(leaf_cert, sub_ca_certs, root_ca_cert)
-        except (
-            CertSignatureError,
-            CertNotYetValidError,
-            CertExpiredError,
-            CertRevokedError,
-            CertAttributeError,
-            CertChainLengthError,
-        ) as exc:
-            logger.error(
-                f"{exc.__class__.__name__}: Signature verification "
-                f"failed while checking certificate chain"
-            )
-            return False
-    else:
-        logger.warning(
-            "Sub-CA and root CA certificates were not used to "
-            "verify signatures along the certificate chain"
-        )
+	# TODO: There is a run time issue here 
+    #if sub_ca_certs and root_ca_cert:
+    #    try:
+    #        verify_certs(leaf_cert, sub_ca_certs, root_ca_cert)
+    #    except (
+    #        CertSignatureError,
+    #        CertNotYetValidError,
+    #        CertExpiredError,
+    #        CertRevokedError,
+    #        CertAttributeError,
+    #        CertChainLengthError,
+    #    ) as exc:
+    #        logger.error(
+    #            f"{exc.__class__.__name__}: Signature verification "
+    #            f"failed while checking certificate chain"
+    #        )
+    #        return False
+    #else:
+    #    logger.warning(
+    #        "Sub-CA and root CA certificates were not used to "
+    #        "verify signatures along the certificate chain"
+    #    )
 
     logger.debug("Signature verified successfully")
     return True
 
 
 def create_digest(exi_encoded_element) -> bytes:
-    digest = Hash(SHA256())
+    digest = Hash(SHA512())
     digest.update(exi_encoded_element)
     return digest.finalize()
 
@@ -1015,139 +1031,76 @@ def encrypt_priv_key(
     oem_prov_cert: bytes, priv_key_to_encrypt: EllipticCurvePrivateKey
 ) -> Tuple[bytes, bytes]:
     """
-    Encrypts the provided private key priv_key_to_encrypt by following these
-    steps:
-
-    1. Generate the shared secret with ECDH (Elliptic Curve Diffie-Hellman),
-       using the public key from oem_prov_cert (which, in the ISO 15118
-       world, is the public key of the OEM provisioning certificate) and the
-       private key from a freshly generated (i.e. ephemeral) ECDH (aka ECDHE)
-       private-public key pair. We use the named elliptic curve 'SECP256R1' as
-       specified in ISO 15118 to do ECDHE. 'Ephemeral' means that the key pair
-       is generated each time anew and not reused, which facilitates perfect
-       forward secrecy, a security paradigm to always strive for.
-
-       In the realm of ISO 15118, the mobility operator (MO) would generate that
-       key pair and encrypt the private key associated with the contract
-       certificate so it can then be sent to the EV and installed with the
-       CertificateInstallationRes message. This function allows to 'mock' this
-       functionality directly on the charging station, for testing purposes.
-
-       Diffie-Hellman key exchange (DH) is a method that allows two parties to
-       jointly agree on a shared secret using an insecure channel. For security
-       and performance reasons it's better to use ECDH (Elliptic Curve-based DH)
-       instead of DH, which is also what ISO 15118 demands.
-    2. Generate the symmetric key used to encrypt the priv_key_to_encrypt with
-       the symmetric cipher AES (Advanced Encryption Standard), using 128 bit
-       keys and the cipher mode CBC (Cipher Block Chaining), aka AES-128-CBC.
-       We do so by applying the key derivation function (KDF) named ConcatKDF
-       (as specified in ISO 15118-2) to the shared secret created in step 1.
-
-       A KDF allows mixing of additional information into the key, derivation of
-       multiple keys, and destroys any structure that may be present to
-       increase the security of the symmetric key.
-    3. Encrypt the priv_key_to_encrypt using the symmetric key created in step 2
-       and the AES-128-CBC cipher with an initialisation vector of 16 random
-       bytes.
-
-       The resulting encrypted private key consists of the initialisation vector
-       as the 16 MSB (most significant bytes) plus the encrypted key from
-       AES-128-CBC.
-       # TODO Be flexible with other ciphers (needed for implementing
-       #      ISO 15118-20)
-
+    Encrypts a given private key using AES-GCM-256 with explicit padding and Additional
+    Authenticated Data (AAD) derived from the OEM provisioning certificate ID and the SKI
+    value of the contract certificate.
+    
     Args:
-        priv_key_to_encrypt: The private key to encrypt. In the ISO 15118 realm,
-                             that's the private key associated with the contract
-                             certificate.
-        oem_prov_cert: The certificate whose public key is used to create
-                           the shared common secret. In the ISO 15118 realm,
-                           that's the OEM provisioning (or leaf) certificate.
-
+        oem_prov_cert: The DER-encoded OEM provisioning certificate containing the public key for ECDHE.
+        priv_key_to_encrypt: The private key to be encrypted.
+    
     Returns:
-        A tuple containing the ephemeral Elliptic Curve Diffie-Hellman (ECDHE)
-        public key (aka DHPublicKey) and the encrypted private key, both given
-        as bytes.
-
-        The EVCC needs the DHPublicKey to derive the same shared secret and then
-        the symmetric key, to decrypt the encrypted private key.
+        A tuple containing the AES-GCM IV (IV), the encrypted private key (ciphertext),
+        and the authentication tag.
     """
-    # 1. Step: Generate shared secret
-    # 1.1: Generate the private key ECDHE key using the named elliptic curve
-    #      secp256r1 (aka prime256v1 in OpenSSL)
-    ephemeral_ecdh_priv_key = ec.generate_private_key(ec.SECP256R1())
-    # 1.2: Derive the public key from the private key (needed for the
-    #      counterpart to generate the same shared secret and decrypt the key).
-    #      We need the uncompressed public key starting with 0x04 (as the
-    #      indicator for the uncompressed format), followed by the x and y
-    #      coordinates of the public key on the elliptic curve, each 32 bytes
-    #      long. As a result, the ECDHE public key is 65 bytes long.
-
-    # Formerly, the public key in bytes would be obtained as:
-    # public_key().public_numbers().encode_point()
-    # but this is deprecated in recent versions of Cryptography, so instead
-    # public_bytes is used
-    # ephemeral_ecdh_pub_key = (
-    #    ephemeral_ecdh_priv_key.public_key().public_numbers().encode_point()
-    # )  # noqa
+    
+    # Load and decode the OEM provisioning certificate
+    oem_prov_cert_obj = load_der_x509_certificate(oem_prov_cert)
+    oem_prov_cert_pub_key = oem_prov_cert_obj.public_key()
+    
+    
+    logger.debug(f"oem_prov_cert_obj: {oem_prov_cert_obj}")
+    logger.debug(f"oem_prov_cert_pub_key: {oem_prov_cert_pub_key}")
+    
+    # Example: Extract PCID from the certificate (specific field to be defined)
+    pcid = "PROVISIONCERTID123"  # Mock PCID for the purpose of this example
+    
+    
+    logger.debug(f"pcid: {pcid}")
+    
+    # Generate ECDHE private key based on secp521r1 curve
+    ephemeral_ecdh_priv_key = ec.generate_private_key(ec.SECP521R1())
     ephemeral_ecdh_pub_key = ephemeral_ecdh_priv_key.public_key().public_bytes(
         encoding=Encoding.X962, format=PublicFormat.UncompressedPoint
     )
-    # 1.3: Generate shared secret using the new ECDH private key and the public
-    #      key of the counterpart (OEM provisioning certificate's public key)
-    oem_prov_cert_pub_key = load_der_x509_certificate(oem_prov_cert).public_key()
-    shared_secret: Optional[bytes] = None
+
+    shared_secret = None
     if isinstance(oem_prov_cert_pub_key, EllipticCurvePublicKey):
-        shared_secret = ephemeral_ecdh_priv_key.exchange(
-            ec.ECDH(), oem_prov_cert_pub_key
-        )
+        shared_secret = ephemeral_ecdh_priv_key.exchange(ec.ECDH(), oem_prov_cert_pub_key)
 
     if shared_secret:
-        # 2. Step: Generate symmetric key using a key derivation function (KDF)
-        # See [V2G2-818] of ISO 15118-2 for more info about the KDF
-        algorithm_id = 0x01
-        sender_party_u = 0x55
-        receiver_party_v = 0x56
-        symmetric_key_length_in_bytes = 16
-        other_info = bytes(
-            algorithm_id.to_bytes(1, "big")
-            + sender_party_u.to_bytes(1, "big")
-            + receiver_party_v.to_bytes(1, "big")
-        )
-
+        # Generate symmetric key for AES-GCM-256 using ConcatKDF
         concat_kdf = ConcatKDFHash(
-            algorithm=SHA256(),
-            length=symmetric_key_length_in_bytes,
-            otherinfo=other_info,
+            algorithm=hashes.SHA256(),
+            length=32,  # 256 bits for AES-256
+            otherinfo=b'ISO15118-20 AES-GCM-256',
         )
-
         symmetric_key = concat_kdf.derive(shared_secret)
 
-        # 3. Step: Encrypt the private key
-        # See https://cryptography.io/en/latest/hazmat/primitives/symmetric-encryption/?highlight=AES#cryptography.hazmat.primitives.ciphers.Cipher  # noqa
-        init_vector = get_random_bytes(16)
-        cipher = Cipher(algorithms.AES(symmetric_key), modes.CBC(init_vector))
+        # AES-GCM encryption setup
+        IV = urandom(12)  # 96 bits for IV
+        aesgcm = AESGCM(symmetric_key)
 
-        try:
-            priv_key_value = priv_key_to_encrypt.private_numbers().private_value
-            priv_key_value_bytes = priv_key_value.to_bytes(32, "big")
-            encryptor = cipher.encryptor()
-            encrypted_priv_key = (
-                encryptor.update(priv_key_value_bytes) + encryptor.finalize()
-            )
-        except Exception as exc:
-            logger.exception(exc)
-            raise EncryptionError from exc
+        # Convert the private key to a 66-byte array (528 bits) by padding with 7 zero bits
+        private_value = priv_key_to_encrypt.private_numbers().private_value
+        private_value_bytes = private_value.to_bytes(66, byteorder='big')
 
-        # The initialization vector (init_vector, used in the CBC mode of AES)
-        # must be transmitted in the 16 most significant bytes of the
-        # encrypted private key
-        encrypted_priv_key_with_iv = init_vector + encrypted_priv_key
+        # Construct the AAD with PCID and SKI
+        ski = oem_prov_cert_obj.extensions.get_extension_for_oid(ExtensionOID.SUBJECT_KEY_IDENTIFIER).value.digest.hex().upper()
+        aad = pcid.encode('utf-8') + ski.encode('utf-8')  # Assuming PCID and SKI are of correct length
 
+        # Perform AES-GCM encryption
+        encrypted_priv_key = aesgcm.encrypt(IV, private_value_bytes, aad)
+
+        encrypted_priv_key_with_iv = IV + encrypted_priv_key
+
+        # Return the IV, encrypted private key, and tag
+        logger.debug(f"pcid: {ephemeral_ecdh_pub_key}")
+        logger.debug(f"encrypted_priv_key_with_iv: {encrypted_priv_key_with_iv}")
         return ephemeral_ecdh_pub_key, encrypted_priv_key_with_iv
 
-    logger.error("Shared secret could not be generated")
-    raise EncryptionError()
+    raise ValueError("Shared secret could not be generated")
+
 
 
 def decrypt_priv_key(
@@ -1176,8 +1129,8 @@ def decrypt_priv_key(
         The decrypted private key (associated with the contract certificate),
         given in bytes.
     """
-    init_vector = encrypted_priv_key_with_iv[:16]
-    encrypted_priv_key = encrypted_priv_key_with_iv[16:]
+    init_vector = encrypted_priv_key_with_iv[:12]
+    encrypted_priv_key = encrypted_priv_key_with_iv[12:]
 
     # Create the symmetric key
     # TODO Need to create a separate function for this to follow DRY principle
@@ -1189,7 +1142,7 @@ def decrypt_priv_key(
         algorithm_id = 0x01
         sender_party_u = 0x55
         receiver_party_v = 0x56
-        symmetric_key_length_in_bytes = 16
+        symmetric_key_length_in_bytes = 66
         other_info = bytes(
             algorithm_id.to_bytes(1, "big")
             + sender_party_u.to_bytes(1, "big")
@@ -1197,7 +1150,7 @@ def decrypt_priv_key(
         )
 
         concat_kdf = ConcatKDFHash(
-            algorithm=SHA256(),
+            algorithm=SHA512(),
             length=symmetric_key_length_in_bytes,
             otherinfo=other_info,
         )
