@@ -1,0 +1,16 @@
+[ca]
+default_ca = CA_default
+
+[CA_default]
+database = index.txt
+default_md = sha256
+policy = policy_strict
+serial = serial
+
+[policy_strict]
+countryName             = match
+stateOrProvinceName     = optional
+organizationName        = match
+organizationalUnitName  = optional
+commonName              = supplied
+emailAddress            = optional

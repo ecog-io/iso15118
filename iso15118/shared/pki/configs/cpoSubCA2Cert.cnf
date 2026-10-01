@@ -12,4 +12,4 @@ domainComponent			= V2G
 basicConstraints		= critical,CA:true,pathlen:0
 keyUsage				= critical,keyCertSign,cRLSign
 subjectKeyIdentifier	= hash
-
+authorityInfoAccess = OCSP;URI:https://localhost:8080/

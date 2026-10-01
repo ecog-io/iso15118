@@ -12,4 +12,4 @@ domainComponent			= CPS
 basicConstraints		= critical,CA:false
 keyUsage				= critical,digitalSignature
 subjectKeyIdentifier	= hash
-
+authorityInfoAccess = OCSP;URI:https://localhost:8080/

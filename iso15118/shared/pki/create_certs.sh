@@ -43,7 +43,7 @@ ISO_20="iso-20"
 
 usage() {
   echo "
-  Usage: "$0" [-h] [-v <iso-2|iso-20>] [-p password] [-k]
+  Usage: "$0" [-h] [-v <iso-2|iso-20>] [-p password] [-k] [--ocsp-req] [--ocsp-resp]
 
   Options:
    -h --help          Returns this helper
@@ -52,6 +52,10 @@ usage() {
    -p --password      The password to encrypt and decrypt the private keys
    -k --keysight      Generate certificates to be used while pairing with Keysight test system,
                       alongside this iso15118 project.
+      --ocsp-req      Don't generate any certificates - instead, send an OCSP request to
+                      validate the SECC leaf certificate.
+      --ocsp-resp     Don't generate any certificates - instead, start an OCSP responder for
+                      validating SECC leaf certificates.
 
 
   Description:
@@ -104,6 +108,12 @@ while [ -n "$1" ]; do
         -k|--keysight)
             keysight_certs="1"
             ;;
+        --ocsp-req)
+            ocsp_request="1"
+            ;;
+        --ocsp-resp)
+            ocsp_responder="1"
+            ;;
          *)
             echo "Unknown option $1"
             usage
@@ -111,7 +121,6 @@ while [ -n "$1" ]; do
     esac
     shift
 done
-
 
 # Set the cryptographic parameters, depending on whether to create certificates and key
 # material for ISO 15118-2 or ISO 15118-20
@@ -142,13 +151,31 @@ fi
 
 echo "Password used is: '$password'"
 
-# 0) Create directories if not yet existing
 CERT_PATH=$ISO_FOLDER/certs
 KEY_PATH=$ISO_FOLDER/private_keys
 CSR_PATH=$ISO_FOLDER/csrs
+NEWCERT_PATH=$ISO_FOLDER/newcerts
+
+if [ "$ocsp_request" == "1" ];
+then
+    openssl ocsp -verify_other $CERT_PATH/ocspLocalhost.pem -trust_other -url localhost:8080 -resp_text -issuer $CERT_PATH/cpoSubCA2Cert.pem -cert $CERT_PATH/seccLeafCert.pem
+    exit
+fi
+
+if [ "$ocsp_responder" == "1" ];
+then
+    openssl ocsp -host localhost -port 8080 -text -index index.txt -CA $CERT_PATH/cpoSubCA2Cert.pem -rkey $KEY_PATH/ocspLocalhost.key -rsigner $CERT_PATH/ocspLocalhost.pem
+    exit
+fi
+
+# 0) Create directories if not yet existing
 mkdir -p $CERT_PATH
 mkdir -p $CSR_PATH
 mkdir -p $KEY_PATH
+mkdir -p $NEWCERT_PATH
+echo -n "" > index.txt
+echo "00" > serial
+sync
 
 
 # 1) Create a self-signed V2GRootCA certificate
@@ -187,8 +214,7 @@ openssl req -new -key $KEY_PATH/v2gRootCA.key -passin pass:$password -config con
 #	- each issued certificate must contain a unique serial number assigned by the CA (must be unique within the issuers number range) -> -set_serial
 #	- save the certificate at the location provided -> -out
 # 	- make the certificate valid for 40 years (give in days) -> -days
-openssl x509 -req -in $CSR_PATH/v2gRootCA.csr -extfile configs/v2gRootCACert.cnf -extensions ext -signkey $KEY_PATH/v2gRootCA.key -passin pass:$password $SHA -set_serial 12345 -out $CERT_PATH/v2gRootCACert.pem -days $VALIDITY_V2G_ROOT_CERT
-
+yes | openssl ca -in $CSR_PATH/v2gRootCA.csr -config configs/ca.cnf -extfile configs/v2gRootCACert.cnf -extensions ext -outdir $NEWCERT_PATH -selfsign -keyfile $KEY_PATH/v2gRootCA.key -passin pass:$password -out $CERT_PATH/v2gRootCACert.pem -days $VALIDITY_V2G_ROOT_CERT
 
 # 2) Create an intermediate CPO sub-CA 1 certificate which is directly signed
 #    by the V2GRootCA certificate
@@ -203,7 +229,7 @@ openssl req -new -key $KEY_PATH/cpoSubCA1.key -passin pass:$password -config con
 #      find the CA’s private key. We need the private key to create the signature
 #      and the public key certificate to make sure that the CA’s certificate and
 #      private key match.
-openssl x509 -req -in $CSR_PATH/cpoSubCA1.csr -extfile configs/cpoSubCA1Cert.cnf -extensions ext -CA $CERT_PATH/v2gRootCACert.pem -CAkey $KEY_PATH/v2gRootCA.key -passin pass:$password -set_serial 12346 -out $CERT_PATH/cpoSubCA1Cert.pem -days $VALIDITY_CPO_SUBCA1_CERT
+yes | openssl ca -in $CSR_PATH/cpoSubCA1.csr -config configs/ca.cnf -extfile configs/cpoSubCA1Cert.cnf -extensions ext -outdir $NEWCERT_PATH -cert $CERT_PATH/v2gRootCACert.pem -keyfile $KEY_PATH/v2gRootCA.key -passin pass:$password -out $CERT_PATH/cpoSubCA1Cert.pem -days $VALIDITY_CPO_SUBCA1_CERT
 
 
 # 3) Create a second intermediate CPO sub-CA certificate (sub-CA 2) just the way
@@ -216,7 +242,7 @@ openssl x509 -req -in $CSR_PATH/cpoSubCA1.csr -extfile configs/cpoSubCA1Cert.cnf
 #	- validity period differs
 openssl ecparam -genkey -name $EC_CURVE | openssl ec $SYMMETRIC_CIPHER -passout pass:$password -out $KEY_PATH/cpoSubCA2.key
 openssl req -new -key $KEY_PATH/cpoSubCA2.key -passin pass:$password -config configs/cpoSubCA2Cert.cnf -out $CSR_PATH/cpoSubCA2.csr
-openssl x509 -req -in $CSR_PATH/cpoSubCA2.csr -extfile configs/cpoSubCA2Cert.cnf -extensions ext -CA $CERT_PATH/cpoSubCA1Cert.pem -CAkey $KEY_PATH/cpoSubCA1.key -passin pass:$password -set_serial 12347 -days $VALIDITY_CPO_SUBCA2_CERT -out $CERT_PATH/cpoSubCA2Cert.pem
+yes | openssl ca -in $CSR_PATH/cpoSubCA2.csr -config configs/ca.cnf -extfile configs/cpoSubCA2Cert.cnf -extensions ext -outdir $NEWCERT_PATH -cert $CERT_PATH/cpoSubCA1Cert.pem -keyfile $KEY_PATH/cpoSubCA1.key -passin pass:$password -days $VALIDITY_CPO_SUBCA2_CERT -out $CERT_PATH/cpoSubCA2Cert.pem
 
 
 # 4) Create an SECC certificate, which is the leaf certificate belonging to
@@ -228,7 +254,7 @@ openssl x509 -req -in $CSR_PATH/cpoSubCA2.csr -extfile configs/cpoSubCA2Cert.cnf
 # - validity period differs
 openssl ecparam -genkey -name $EC_CURVE | openssl ec $SYMMETRIC_CIPHER -passout pass:$password -out $KEY_PATH/seccLeaf.key
 openssl req -new -key $KEY_PATH/seccLeaf.key -passin pass:$password -config configs/seccLeafCert.cnf -out $CSR_PATH/seccLeafCert.csr
-openssl x509 -req -in $CSR_PATH/seccLeafCert.csr -extfile configs/seccLeafCert.cnf -extensions ext -CA $CERT_PATH/cpoSubCA2Cert.pem -CAkey $KEY_PATH/cpoSubCA2.key -passin pass:$password -set_serial 12348 -days $VALIDITY_SECC_LEAF_CERT -out $CERT_PATH/seccLeafCert.pem
+yes | openssl ca -in $CSR_PATH/seccLeafCert.csr -config configs/ca.cnf -extfile configs/seccLeafCert.cnf -extensions ext  -outdir $NEWCERT_PATH -cert $CERT_PATH/cpoSubCA2Cert.pem -keyfile $KEY_PATH/cpoSubCA2.key -passin pass:$password -days $VALIDITY_SECC_LEAF_CERT -out $CERT_PATH/seccLeafCert.pem
 # 4.1) Concatenate the SECC certificate with the CPO Sub-2 and Sub-1 certificates to
 #      provide a certificate chain that can be used for an SSL context when
 #      implementing the TLS handshake
@@ -362,6 +388,15 @@ echo $password > $KEY_PATH/oemLeafPassword.txt
 echo $password > $KEY_PATH/contractLeafPassword.txt
 echo $password > $KEY_PATH/cpsLeafPassword.txt
 echo $password > $KEY_PATH/moSubCA2LeafPassword.txt
+
+
+# 19) Create an OCSP cryptographic pair, signed by cpoSubCA2, allowing us to verify seccLeafCert.
+#     The OCSP cryptographic pair must be signed by the same CA that signed the
+#     certificate being checked.
+openssl ecparam -genkey -name $EC_CURVE | openssl ec $SYMMETRIC_CIPHER -passout pass:$password -out $KEY_PATH/ocspLocalhost.key
+openssl req -new -key $KEY_PATH/ocspLocalhost.key -passin pass:$password -config configs/ocspLocalhost.cnf -out $CSR_PATH/ocspLocalhost.csr
+openssl x509 -req -in $CSR_PATH/ocspLocalhost.csr -extfile configs/ocspLocalhost.cnf -extensions ext -CA $CERT_PATH/cpoSubCA2Cert.pem -CAkey $KEY_PATH/cpoSubCA2.key -passin pass:$password -out $CERT_PATH/ocspLocalhost.pem
+
 
 if [ "$keysight_certs" == "1" ];
 then
