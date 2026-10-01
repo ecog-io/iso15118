@@ -523,9 +523,17 @@ class PVRemainingTimeToFullSOCDin(PVRemainingTimeToFullSOC):
     See section 9.5.2.4 in DIN SPEC 70121
 
     In DIN the Element unit is optional, in ISO it is mandatory.
+    Some vehicles even send the unit in minutes.
     """
 
-    unit: Literal[UnitSymbol.SECONDS] = Field(None, alias="Unit")
+    unit: Literal[UnitSymbol.SECONDS, UnitSymbol.MINUTES] = Field(
+        None, alias="Unit"
+    )  # type: ignore[assignment]
+
+    def get_decimal_value(self) -> float:
+        value = super().get_decimal_value()
+        # unit can only be minutes or seconds. This is already validated
+        return value * 60.0 if self.unit == UnitSymbol.MINUTES else value
 
 
 class PVRemainingTimeToBulkSOCDin(PVRemainingTimeToBulkSOC):
@@ -533,9 +541,17 @@ class PVRemainingTimeToBulkSOCDin(PVRemainingTimeToBulkSOC):
     See section 9.5.2.4 in DIN SPEC 70121
 
     In DIN the Element unit is optional, in ISO it is mandatory.
+    Some vehicles even send the unit in minutes.
     """
 
-    unit: Literal[UnitSymbol.SECONDS] = Field(None, alias="Unit")
+    unit: Literal[UnitSymbol.SECONDS, UnitSymbol.MINUTES] = Field(
+        None, alias="Unit"
+    )  # type: ignore[assignment]
+
+    def get_decimal_value(self) -> float:
+        value = super().get_decimal_value()
+        # unit can only be minutes or seconds. This is already validated
+        return value * 60.0 if self.unit == UnitSymbol.MINUTES else value
 
 
 class DCEVChargeParams(BaseModel):

@@ -451,8 +451,14 @@ class CableCheck(StateSECC):
         ],
         message_exi: bytes = None,
     ):
-        msg = self.check_msg_dinspec(message, [CableCheckReq])
+        # According to the standard SessionStop is not expected here.
+        #  But Tesla sends SessionStop here if SOC is already reached.
+        msg = self.check_msg_dinspec(message, [CableCheckReq, SessionStopReq])
         if not msg:
+            return
+
+        if msg.body.session_stop_req:
+            await SessionStop(self.comm_session).process_message(message, message_exi)
             return
 
         cable_check_req: CableCheckReq = msg.body.cable_check_req
