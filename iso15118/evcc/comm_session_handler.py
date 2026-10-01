@@ -555,19 +555,15 @@ class CommunicationSessionHandler:
                     try:
                         await self.restart_sdp(False)
                     except SDPFailedError as exc:
-                        logger.exception(exc)
-                        # TODO not sure what else to do here
+                        logger.debug("SDP cycle exhausted, starting new cycle")
+                        await self.restart_sdp(True)
                 elif isinstance(notification, StopNotification):
                     await cancel_task(self.comm_session[1])
                     del self.comm_session
                     if notification.successful:
                         break
                     else:
-                        try:
-                            await self.restart_sdp(True)
-                        except SDPFailedError as exc:
-                            logger.exception(exc)
-                            # TODO not sure what else to do here
+                        await self.restart_sdp(True)
                 else:
                     logger.warning(
                         "Communication session handler received "

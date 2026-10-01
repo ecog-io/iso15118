@@ -658,13 +658,21 @@ class ServiceDetail(StateEVCC):
         control_mode_set = False
         if self.comm_session.selected_energy_service:
             parameter_set = self.comm_session.selected_energy_service.parameter_set
-            for param in parameter_set.parameters:
-                if param.name == ParameterName.CONTROL_MODE:
-                    self.comm_session.control_mode = ControlMode(param.int_value)
-                    logger.info(
-                        f"Selected Control Mode: {self.comm_session.control_mode}"
-                    )
-                    control_mode_set = True
+            offered = [
+                ControlMode(param.int_value)
+                for param in parameter_set.parameters
+                if param.name == ParameterName.CONTROL_MODE
+            ]
+            if offered:
+                # Prefer DYNAMIC when the SECC offers it. Some chargers (e.g.
+                # SEIC3500) advertise both modes in one parameter set but only
+                # complete ScheduleExchange in Dynamic; a naive last-wins pick of
+                # SCHEDULED then crashes in PowerDelivery (scheduled_params is None).
+                self.comm_session.control_mode = (
+                    ControlMode.DYNAMIC if ControlMode.DYNAMIC in offered else offered[-1]
+                )
+                logger.info(f"Selected Control Mode: {self.comm_session.control_mode}")
+                control_mode_set = True
         return control_mode_set
 
     def store_parameter_sets(self, service_detail_res: ServiceDetailRes):
