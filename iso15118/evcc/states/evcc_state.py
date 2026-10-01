@@ -254,7 +254,7 @@ class StateEVCC(State, ABC):
         power_delivery_req = PowerDeliveryReq(
             header=MessageHeader(
                 session_id=self.comm_session.session_id,
-                timestamp=time.time(),
+                timestamp=int(time.time() * 1_000_000),
             ),
             ev_processing=Processing.FINISHED,
             charge_progress=ChargeProgress.STOP,

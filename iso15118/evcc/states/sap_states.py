@@ -132,7 +132,8 @@ class SupportedAppProtocol(StateEVCC):
                         protocol.protocol_ns
                     )
                     header = MessageHeaderV20(
-                        session_id=self.get_session_id(length=8), timestamp=time.time()
+                        session_id=self.get_session_id(length=8),
+                        timestamp=int(time.time() * 1_000_000),
                     )
                     next_msg = SessionSetupReqV20(
                         header=header,

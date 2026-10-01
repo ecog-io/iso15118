@@ -54,7 +54,7 @@ def get_v2g_message_service_detail_req(service_list: int) -> ServiceDetailReq:
     return ServiceDetailReq(
         header=MessageHeader(
             session_id=MOCK_SESSION_ID,
-            timestamp=time.time(),
+            timestamp=int(time.time() * 1_000_000),
         ),
         service_id=service_list,
     )
@@ -75,7 +75,7 @@ def get_v2g_message_authorization_req(auth_service: AuthEnum) -> AuthorizationRe
     return AuthorizationReq(
         header=MessageHeader(
             session_id=MOCK_SESSION_ID,
-            timestamp=time.time(),
+            timestamp=int(time.time() * 1_000_000),
         ),
         selected_auth_service=auth_service,
         eim_params=eim_params,
@@ -108,7 +108,7 @@ def get_v2g_message_dc_charge_parameter_discovery_req(
     return DCChargeParameterDiscoveryReq(
         header=MessageHeader(
             session_id=MOCK_SESSION_ID,
-            timestamp=time.time(),
+            timestamp=int(time.time() * 1_000_000),
         ),
         dc_params=dc_params,
         bpt_dc_params=bpt_dc_params,
@@ -140,7 +140,7 @@ def get_schedule_exchange_req_message(control_mode: ControlMode):
     return ScheduleExchangeReq(
         header=MessageHeader(
             session_id=MOCK_SESSION_ID,
-            timestamp=time.time(),
+            timestamp=int(time.time() * 1_000_000),
         ),
         max_supporting_points=12,
         scheduled_params=scheduled_params,
@@ -152,7 +152,7 @@ def get_cable_check_req():
     return DCCableCheckReq(
         header=MessageHeader(
             session_id=MOCK_SESSION_ID,
-            timestamp=time.time(),
+            timestamp=int(time.time() * 1_000_000),
         )
     )
 
@@ -161,7 +161,7 @@ def get_precharge_req(processing: Processing):
     return DCPreChargeReq(
         header=MessageHeader(
             session_id=MOCK_SESSION_ID,
-            timestamp=time.time(),
+            timestamp=int(time.time() * 1_000_000),
         ),
         ev_processing=processing,
         ev_present_voltage=RationalNumber(exponent=0, value=10),
@@ -173,7 +173,7 @@ def get_power_delivery_req(processing: Processing, charge_progress: ChargeProgre
     return PowerDeliveryReq(
         header=MessageHeader(
             session_id=MOCK_SESSION_ID,
-            timestamp=time.time(),
+            timestamp=int(time.time() * 1_000_000),
         ),
         ev_processing=processing,
         charge_progress=charge_progress,
@@ -206,7 +206,7 @@ def get_dc_service_discovery_req(
     return DCChargeParameterDiscoveryReq(
         header=MessageHeader(
             session_id=MOCK_SESSION_ID,
-            timestamp=time.time(),
+            timestamp=int(time.time() * 1_000_000),
         ),
         dc_params=dc_params,
         bpt_dc_params=dc_bpt_params,
@@ -228,7 +228,7 @@ def get_ac_service_discovery_req(
     return ACChargeParameterDiscoveryReq(
         header=MessageHeader(
             session_id=MOCK_SESSION_ID,
-            timestamp=time.time(),
+            timestamp=int(time.time() * 1_000_000),
         ),
         ac_params=ac_params,
         bpt_ac_params=ac_bpt_params,
@@ -264,7 +264,7 @@ def get_ac_charge_loop_req(
     return ACChargeLoopReq(
         header=MessageHeader(
             session_id=MOCK_SESSION_ID,
-            timestamp=time.time(),
+            timestamp=int(time.time() * 1_000_000),
         ),
         scheduled_params=scheduled_params,
         dynamic_params=dynamic_params,
@@ -302,7 +302,7 @@ def get_dc_charge_loop_req(
     return DCChargeLoopReq(
         header=MessageHeader(
             session_id=MOCK_SESSION_ID,
-            timestamp=time.time(),
+            timestamp=int(time.time() * 1_000_000),
         ),
         ev_present_voltage=RationalNumber(exponent=0, value=300),
         scheduled_params=scheduled_params,

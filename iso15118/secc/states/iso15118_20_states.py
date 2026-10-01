@@ -166,7 +166,9 @@ class SessionSetup(StateSECC):
             self.response_code = ResponseCode.OK_NEW_SESSION_ESTABLISHED
 
         session_setup_res = SessionSetupRes(
-            header=MessageHeader(session_id=session_id, timestamp=time.time()),
+            header=MessageHeader(
+                session_id=session_id, timestamp=int(time.time() * 1_000_000)
+            ),
             response_code=self.response_code,
             evse_id=await self.comm_session.evse_controller.get_evse_id(
                 Protocol.ISO_15118_20_COMMON_MESSAGES
@@ -280,7 +282,8 @@ class AuthorizationSetup(StateSECC):
 
         auth_setup_res = AuthorizationSetupRes(
             header=MessageHeader(
-                session_id=self.comm_session.session_id, timestamp=time.time()
+                session_id=self.comm_session.session_id,
+                timestamp=int(time.time() * 1_000_000),
             ),
             response_code=ResponseCode.OK,
             auth_services=auth_options,
@@ -474,7 +477,8 @@ class Authorization(StateSECC):
 
         auth_res = AuthorizationRes(
             header=MessageHeader(
-                session_id=self.comm_session.session_id, timestamp=time.time()
+                session_id=self.comm_session.session_id,
+                timestamp=int(time.time() * 1_000_000),
             ),
             response_code=response_code,
             evse_processing=evse_processing,
@@ -575,7 +579,8 @@ class ServiceDiscovery(StateSECC):
 
         service_discovery_res = ServiceDiscoveryRes(
             header=MessageHeader(
-                session_id=self.comm_session.session_id, timestamp=time.time()
+                session_id=self.comm_session.session_id,
+                timestamp=int(time.time() * 1_000_000),
             ),
             response_code=ResponseCode.OK,
             service_renegotiation_supported=await self.comm_session.evse_controller.service_renegotiation_supported(),  # noqa: E501
@@ -691,7 +696,8 @@ class ServiceDetail(StateSECC):
             logger.error(f"Service Id is invalid for {message}")
         service_detail_res = ServiceDetailRes(
             header=MessageHeader(
-                session_id=self.comm_session.session_id, timestamp=time.time()
+                session_id=self.comm_session.session_id,
+                timestamp=int(time.time() * 1_000_000),
             ),
             response_code=response_code,
             service_id=service_detail_req.service_id,
@@ -763,7 +769,8 @@ class ServiceSelection(StateSECC):
 
         service_selection_res = ServiceSelectionRes(
             header=MessageHeader(
-                session_id=self.comm_session.session_id, timestamp=time.time()
+                session_id=self.comm_session.session_id,
+                timestamp=int(time.time() * 1_000_000),
             ),
             response_code=ResponseCode.OK,
         )
@@ -968,7 +975,8 @@ class ScheduleExchange(StateSECC):
 
         schedule_exchange_res = ScheduleExchangeRes(
             header=MessageHeader(
-                session_id=self.comm_session.session_id, timestamp=time.time()
+                session_id=self.comm_session.session_id,
+                timestamp=int(time.time() * 1_000_000),
             ),
             response_code=ResponseCode.OK,
             evse_processing=evse_processing,
@@ -1044,7 +1052,8 @@ class PowerDelivery(StateSECC):
 
         next_state: Optional[Type[State]] = None
         header = MessageHeader(
-            session_id=self.comm_session.session_id, timestamp=time.time()
+            session_id=self.comm_session.session_id,
+            timestamp=int(time.time() * 1_000_000),
         )
         response_code = ResponseCode.OK
 
@@ -1278,7 +1287,8 @@ class SessionStop(StateSECC):
 
         session_stop_res = SessionStopRes(
             header=MessageHeader(
-                session_id=self.comm_session.session_id, timestamp=time.time()
+                session_id=self.comm_session.session_id,
+                timestamp=int(time.time() * 1_000_000),
             ),
             response_code=ResponseCode.OK,
         )
@@ -1339,7 +1349,8 @@ class ACChargeParameterDiscovery(StateSECC):
             )
             ac_cpd_res = ACChargeParameterDiscoveryRes(
                 header=MessageHeader(
-                    session_id=self.comm_session.session_id, timestamp=time.time()
+                    session_id=self.comm_session.session_id,
+                    timestamp=int(time.time() * 1_000_000),
                 ),
                 response_code=ResponseCode.OK,
                 ac_params=params if energy_service == ServiceV20.AC else None,
@@ -1447,7 +1458,7 @@ class ACChargeLoop(StateSECC):
         ac_charge_loop_res = ACChargeLoopRes(
             header=MessageHeader(
                 session_id=self.comm_session.session_id,
-                timestamp=time.time(),
+                timestamp=int(time.time() * 1_000_000),
             ),
             evse_status=evse_status,
             # TODO Check for other failed or warning response codes
@@ -1536,7 +1547,8 @@ class DCChargeParameterDiscovery(StateSECC):
             )  # noqa
             dc_cpd_res = DCChargeParameterDiscoveryRes(
                 header=MessageHeader(
-                    session_id=self.comm_session.session_id, timestamp=time.time()
+                    session_id=self.comm_session.session_id,
+                    timestamp=int(time.time() * 1_000_000),
                 ),
                 response_code=ResponseCode.OK,
                 dc_params=params if energy_service == ServiceV20.DC else None,
@@ -1664,7 +1676,8 @@ class DCCableCheck(StateSECC):
 
         dc_cable_check_res = DCCableCheckRes(
             header=MessageHeader(
-                session_id=self.comm_session.session_id, timestamp=time.time()
+                session_id=self.comm_session.session_id,
+                timestamp=int(time.time() * 1_000_000),
             ),
             response_code=ResponseCode.OK,
             evse_processing=processing,
@@ -1736,7 +1749,8 @@ class DCPreCharge(StateSECC):
                 return
         dc_precharge_res = DCPreChargeRes(
             header=MessageHeader(
-                session_id=self.comm_session.session_id, timestamp=time.time()
+                session_id=self.comm_session.session_id,
+                timestamp=int(time.time() * 1_000_000),
             ),
             response_code=ResponseCode.OK,
             evse_present_voltage=await self.comm_session.evse_controller.get_evse_present_voltage(  # noqa
@@ -1857,7 +1871,8 @@ class DCChargeLoop(StateSECC):
 
         dc_charge_loop_res = DCChargeLoopRes(
             header=MessageHeader(
-                session_id=self.comm_session.session_id, timestamp=time.time()
+                session_id=self.comm_session.session_id,
+                timestamp=int(time.time() * 1_000_000),
             ),
             meter_info=meter_info,
             evse_status=evse_status,
@@ -1932,7 +1947,8 @@ class DCWeldingDetection(StateSECC):
         self.expecting_welding_detection_req = False
         welding_detection_res = DCWeldingDetectionRes(
             header=MessageHeader(
-                session_id=self.comm_session.session_id, timestamp=time.time()
+                session_id=self.comm_session.session_id,
+                timestamp=int(time.time() * 1_000_000),
             ),
             response_code=ResponseCode.OK,
             evse_present_voltage=await self.comm_session.evse_controller.get_evse_present_voltage(  # noqa
