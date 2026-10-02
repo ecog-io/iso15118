@@ -67,6 +67,16 @@ class UDPClient(DatagramProtocol):
         interface_index = socket.if_nametoindex(iface)
         sock.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_MULTICAST_IF, interface_index)
 
+        try:
+            # Disable UDP checksum offload - force kernel to compute checksum
+            # in software. This way we prevent charging stations with
+            # kernel 6.x+ to drop packages with wrong calculated checksum by
+            # evcc USB ethernet adapters.
+            SO_NO_CHECK = 11
+            sock.setsockopt(socket.SOL_SOCKET, SO_NO_CHECK, 0)
+        except (OSError, AttributeError) as e:
+            logger.error(f"Could not set IPV6_MIN_HOPCOUNT: {e}")
+
         return sock
 
     async def start(self):
