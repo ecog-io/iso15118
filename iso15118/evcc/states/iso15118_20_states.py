@@ -1530,12 +1530,10 @@ class DCPreCharge(StateEVCC):
 
         precharge_res: DCPreChargeRes = cast(DCPreChargeRes, msg)
         next_state = None
-        if (
-            await self.comm_session.ev_controller.is_precharged(
-                precharge_res.evse_present_voltage
-            )
-            and self.pre_charge_finished_message_built_once
-        ):
+        precharged = await self.comm_session.ev_controller.is_precharged(
+            precharge_res.evse_present_voltage
+        )
+        if precharged and self.pre_charge_finished_message_built_once:
             next_state = PowerDelivery
             next_request = await self.build_power_delivery_req()
             payload_type = ISOV20PayloadTypes.MAINSTREAM
@@ -1549,6 +1547,8 @@ class DCPreCharge(StateEVCC):
             timeout = Timeouts.DC_PRE_CHARGE_REQ
             namespace = Namespace.ISO_V20_DC
             self.pre_charge_finished_message_built_once = True
+            if not precharged:
+                await asyncio.sleep(self.comm_session.config.precharge_retry_delay)
 
         self.create_next_message(
             next_state,
