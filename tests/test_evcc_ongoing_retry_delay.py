@@ -73,7 +73,7 @@ def _comm_session(delay: float) -> Mock:
     )
     comm_session.protocol = Protocol.UNKNOWN
     comm_session.ongoing_timer = -1
-    comm_session.config = EVCCConfig(ongoingRetryDelay=delay)
+    comm_session.config = EVCCConfig(ongoingRetryDelay=delay, prechargeRetryDelay=delay)
     comm_session.authorization_req_message = AuthorizationReq(
         header=MessageHeader(session_id=MOCK_SESSION_ID, timestamp=time.time()),
         selected_auth_service=AuthEnum.EIM,
@@ -81,6 +81,7 @@ def _comm_session(delay: float) -> Mock:
     )
     comm_session.ongoing_schedule_exchange_req = Mock()
     comm_session.selected_charging_type_is_ac = False
+    comm_session.selected_schedule = 1
     comm_session.control_mode = ControlMode.DYNAMIC
     comm_session.selected_energy_service = Mock(service=ServiceV20.DC)
     return comm_session
@@ -164,6 +165,68 @@ async def test_finished_response_does_not_wait(state_cls, check_msg, path, proce
         path,
         processing.FINISHED,
         lambda *a: events.append("send"),
+    )
+
+    with patch("asyncio.sleep", fake_sleep):
+        await state.process_message(message=Mock())
+
+    assert events == ["send"]
+
+
+PRECHARGE_STATES = [
+    (iso2.PreCharge, "check_msg_v2"),
+    (din.PreCharge, "check_msg_din_spec"),
+    (iso20.DCPreCharge, "check_msg_v20"),
+]
+
+
+def _precharge_state(state_cls, check_msg, precharged, on_send):
+    state = state_cls(_comm_session(delay=0.2))
+    state.comm_session.ev_controller.is_precharged = AsyncMock(return_value=precharged)
+    setattr(state, check_msg, Mock(return_value=MagicMock()))
+    setattr(state, "create_next_message", Mock(side_effect=on_send))
+    return state
+
+
+def test_precharge_retry_delay_default_is_100_ms():
+    assert EVCCConfig().precharge_retry_delay == 0.1
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "state_cls, check_msg",
+    PRECHARGE_STATES,
+    ids=[
+        f"{s.__module__.rsplit('.', 1)[-1]}.{s.__name__}" for s, _ in PRECHARGE_STATES
+    ],
+)
+async def test_precharge_waits_before_resending(state_cls, check_msg):
+    events: list = []
+    fake_sleep = AsyncMock(side_effect=lambda delay: events.append(("sleep", delay)))
+    state = _precharge_state(
+        state_cls, check_msg, False, lambda *a: events.append("send")
+    )
+
+    with patch("asyncio.sleep", fake_sleep):
+        await state.process_message(message=Mock())
+        await state.process_message(message=Mock())
+
+    assert events == [("sleep", 0.2), "send", ("sleep", 0.2), "send"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "state_cls, check_msg",
+    PRECHARGE_STATES,
+    ids=[
+        f"{s.__module__.rsplit('.', 1)[-1]}.{s.__name__}" for s, _ in PRECHARGE_STATES
+    ],
+)
+async def test_precharged_voltage_does_not_wait(state_cls, check_msg):
+    events: list = []
+    fake_sleep = AsyncMock(side_effect=lambda delay: events.append(("sleep", delay)))
+    state = _precharge_state(
+        state_cls, check_msg, True, lambda *a: events.append("send")
     )
 
     with patch("asyncio.sleep", fake_sleep):
