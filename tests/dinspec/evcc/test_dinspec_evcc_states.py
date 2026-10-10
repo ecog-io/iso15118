@@ -54,7 +54,9 @@ class TestEvScenarios:
         self.comm_session_mock.stop_reason = StopNotification(False, "pytest")
         evcc_config = EVCCConfig()
         evcc_config.energy_transfer_mode = EnergyTransferModeEnum.DC_EXTENDED
+        evcc_config.ongoing_retry_delay = 0
         self.comm_session_mock.ev_controller = SimEVController(evcc_config)
+        self.comm_session_mock.config = evcc_config
         self.comm_session_mock.protocol = Protocol.DIN_SPEC_70121
         self.comm_session_mock.selected_schedule = 1
         self.comm_session_mock.selected_services = []

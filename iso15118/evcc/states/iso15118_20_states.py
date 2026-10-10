@@ -416,6 +416,7 @@ class Authorization(StateEVCC):
                 eim_params=self.comm_session.authorization_req_message.eim_params,
             )
 
+            await asyncio.sleep(self.comm_session.config.ongoing_retry_delay)
             self.create_next_message(
                 Authorization,
                 auth_req,
@@ -813,6 +814,7 @@ class ScheduleExchange(StateEVCC):
         schedule_exchange_res: ScheduleExchangeRes = cast(ScheduleExchangeRes, msg)
 
         if schedule_exchange_res.evse_processing == Processing.ONGOING:
+            await asyncio.sleep(self.comm_session.config.ongoing_retry_delay)
             self.create_next_message(
                 ScheduleExchange,
                 self.comm_session.ongoing_schedule_exchange_req,
@@ -1477,6 +1479,7 @@ class DCCableCheck(StateEVCC):
                     timestamp=time.time(),
                 )
             )
+            await asyncio.sleep(self.comm_session.config.ongoing_retry_delay)
             self.create_next_message(
                 None,
                 cable_check_req,
