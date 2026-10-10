@@ -14,11 +14,15 @@ from iso15118.evcc.controller.simulator import SimEVController
 from iso15118.evcc.states import din_spec_states as din
 from iso15118.evcc.states import iso15118_2_states as iso2
 from iso15118.evcc.states import iso15118_20_states as iso20
+from iso15118.shared.messages.datatypes import DCEVSEStatusCode
 from iso15118.shared.messages.enums import (
     AuthEnum,
+    ControlMode,
     EnergyTransferModeEnum,
     EVSEProcessing,
+    IsolationLevel,
     Protocol,
+    ServiceV20,
 )
 from iso15118.shared.messages.iso15118_20.common_messages import (
     AuthorizationReq,
@@ -76,16 +80,22 @@ def _comm_session(delay: float) -> Mock:
         eim_params=EIMAuthReqParams(),
     )
     comm_session.ongoing_schedule_exchange_req = Mock()
+    comm_session.selected_charging_type_is_ac = False
+    comm_session.control_mode = ControlMode.DYNAMIC
+    comm_session.selected_energy_service = Mock(service=ServiceV20.DC)
     return comm_session
 
 
-def _ongoing_state(state_cls, check_msg, path, processing, on_send):
-    """The state under test, fed EVSEProcessing = Ongoing, sends via `on_send`."""
+def _state(state_cls, check_msg, path, evse_processing, on_send):
+    """The state under test, fed `evse_processing`, sends via `on_send`."""
     msg = MagicMock()
     res = msg
     for attr in filter(None, path.split(".")):
         res = getattr(res, attr)
-    res.evse_processing = processing.ONGOING
+    res.evse_processing = evse_processing
+    # CableCheck only moves on to PreCharge with a ready, insulated EVSE
+    res.dc_evse_status.evse_status_code = DCEVSEStatusCode.EVSE_READY
+    res.dc_evse_status.evse_isolation_status = IsolationLevel.VALID
     state = state_cls(_comm_session(delay=0.2))
     setattr(state, check_msg, Mock(return_value=msg))
     setattr(state, "create_next_message", Mock(side_effect=on_send))
@@ -107,8 +117,12 @@ async def test_ongoing_response_waits_before_resending(
 ):
     events: list = []
     fake_sleep = AsyncMock(side_effect=lambda delay: events.append(("sleep", delay)))
-    state = _ongoing_state(
-        state_cls, check_msg, path, processing, lambda *a: events.append("send")
+    state = _state(
+        state_cls,
+        check_msg,
+        path,
+        processing.ONGOING,
+        lambda *a: events.append("send"),
     )
 
     with patch("asyncio.sleep", fake_sleep):
@@ -121,11 +135,38 @@ async def test_ongoing_response_waits_before_resending(
 @pytest.mark.asyncio
 async def test_authorization_resends_are_spaced_in_real_time():
     sent_at: list = []
-    state = _ongoing_state(
-        *ONGOING_STATES[0], lambda *a: sent_at.append(time.monotonic())
+    state = _state(
+        iso2.Authorization,
+        "check_msg_v2",
+        "body.authorization_res",
+        EVSEProcessing.ONGOING,
+        lambda *a: sent_at.append(time.monotonic()),
     )
 
     await state.process_message(message=Mock())
     await state.process_message(message=Mock())
 
     assert sent_at[1] - sent_at[0] >= 0.2
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "state_cls, check_msg, path, processing",
+    ONGOING_STATES,
+    ids=[f"{s.__module__.rsplit('.', 1)[-1]}.{s.__name__}" for s, *_ in ONGOING_STATES],
+)
+async def test_finished_response_does_not_wait(state_cls, check_msg, path, processing):
+    events: list = []
+    fake_sleep = AsyncMock(side_effect=lambda delay: events.append(("sleep", delay)))
+    state = _state(
+        state_cls,
+        check_msg,
+        path,
+        processing.FINISHED,
+        lambda *a: events.append("send"),
+    )
+
+    with patch("asyncio.sleep", fake_sleep):
+        await state.process_message(message=Mock())
+
+    assert events == ["send"]

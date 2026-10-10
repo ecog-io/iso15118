@@ -77,8 +77,8 @@ class EVCCConfig(BaseModel):
     # EVSEProcessing = Ongoing (Authorization, ChargeParameterDiscovery,
     # CableCheck, ScheduleExchange). The standards set no minimum interval, but
     # without a pause the EVCC sends thousands of requests per second (measured:
-    # 459,721 AuthorizationReq in 55 s). 0.5 s matches the test EV of the EcoG
-    # C++ stack. 0 restores the old back-to-back behaviour.
+    # 459,721 AuthorizationReq in 55 s). The default matches a field-deployed
+    # C++ EVSE stack (500 ms). 0 restores the old back-to-back behaviour.
     ongoing_retry_delay: float = Field(0.5, alias="ongoingRetryDelay")
 
     def load_raw_values(self):
