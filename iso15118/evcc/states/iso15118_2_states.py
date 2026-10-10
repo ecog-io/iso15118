@@ -1346,6 +1346,7 @@ class PreCharge(StateEVCC):
                 self.comm_session.ongoing_timer = time()
 
             precharge_req = await self.build_pre_charge_message()
+            await asyncio.sleep(self.comm_session.config.precharge_retry_delay)
             self.create_next_message(
                 PreCharge,
                 precharge_req,
