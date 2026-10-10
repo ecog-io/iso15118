@@ -315,6 +315,8 @@ class ContractAuthentication(StateEVCC):
             next_state = ChargeParameterDiscovery
             next_message = await self.build_charge_parameter_discovery_req()
             timeout = Timeouts.CHARGE_PARAMETER_DISCOVERY_REQ
+        else:
+            await asyncio.sleep(self.comm_session.config.ongoing_retry_delay)
 
         self.create_next_message(
             next_state,
@@ -416,6 +418,7 @@ class ChargeParameterDiscovery(StateEVCC):
                 await self.build_charge_parameter_discovery_req()
             )
 
+            await asyncio.sleep(self.comm_session.config.ongoing_retry_delay)
             self.create_next_message(
                 None,
                 charge_parameter_discovery_req,
@@ -504,6 +507,7 @@ class CableCheck(StateEVCC):
             elif self.comm_session.ongoing_timer == -1:
                 self.comm_session.ongoing_timer = time()
 
+            await asyncio.sleep(self.comm_session.config.ongoing_retry_delay)
             self.create_next_message(
                 None,
                 await self.build_cable_check_req(),
