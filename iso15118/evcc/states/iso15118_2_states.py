@@ -716,6 +716,7 @@ class Authorization(StateEVCC):
             else:
                 self.comm_session.ongoing_timer = time()
 
+            await asyncio.sleep(self.comm_session.config.ongoing_retry_delay)
             self.create_next_message(
                 Authorization,
                 AuthorizationReq(),
@@ -826,6 +827,7 @@ class ChargeParameterDiscovery(StateEVCC):
                 dc_ev_charge_parameter=charge_params.dc_parameters,
             )
 
+            await asyncio.sleep(self.comm_session.config.ongoing_retry_delay)
             self.create_next_message(
                 ChargeParameterDiscovery,
                 charge_parameter_discovery_req,
@@ -1270,6 +1272,7 @@ class CableCheck(StateEVCC):
             cable_check_req = CableCheckReq(
                 dc_ev_status=await self.comm_session.ev_controller.get_dc_ev_status(),
             )
+            await asyncio.sleep(self.comm_session.config.ongoing_retry_delay)
             self.create_next_message(
                 CableCheck,
                 cable_check_req,
