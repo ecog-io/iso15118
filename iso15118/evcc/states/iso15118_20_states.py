@@ -505,9 +505,20 @@ class ServiceDiscovery(StateEVCC):
 
         if service_discovery_res.vas_list:
             for vas_service in service_discovery_res.vas_list.services:
+                # An SECC may offer IDs this EVCC does not know (reserved or
+                # implementation specific, see Table 204). The EVCC just does
+                # not select them.
+                try:
+                    service = ServiceV20.get_by_id(vas_service.service_id)
+                except ValueError:
+                    logger.info(
+                        f"Ignoring unknown value-added service "
+                        f"(ServiceID {vas_service.service_id})"
+                    )
+                    continue
                 self.comm_session.matched_services_v20.append(
                     MatchedService(
-                        service=ServiceV20.get_by_id(vas_service.service_id),
+                        service=service,
                         is_energy_service=False,
                         is_free=vas_service.free_service,
                         # Parameter sets are available with ServiceDetailRes
