@@ -124,7 +124,9 @@ class SessionSetupRes(Response):
      as “0x49 0xA8 0x9A 0x63 0x60”.
     """
 
-    evse_id: str = Field(..., min_length=2, max_length=32, alias="EVSEID")
+    # The XSD evseIDType is hexBinary with maxLength 32, which counts octets:
+    # 32 bytes are 64 hex digits in this string
+    evse_id: str = Field(..., min_length=2, max_length=64, alias="EVSEID")
     datetime_now: int = Field(None, alias="DateTimeNow")
 
 

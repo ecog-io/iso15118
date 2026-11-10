@@ -251,6 +251,15 @@ DIN_TEST_MESSAGES = [
         "SAIDType as xs:short without a range restriction, unlike "
         "ISO 15118-2 (unsignedByte 1..255).",
     ),
+    ExiMessageContainer(
+        message_name="SessionSetupRes",
+        json_str='{"V2G_Message": {"Header": {"SessionID": "AB9AB72CABAEFC72"},"Body":'
+        '{"SessionSetupRes": {"ResponseCode": "OK_NewSessionEstablished",'
+        '"EVSEID": "746573742D636861726765722D65767365", '
+        '"DateTimeNow": 1659025085}}}}',
+        description="EVSEID of 17 bytes (34 hex digits): evseIDType is "
+        "hexBinary with maxLength 32, which counts octets, not hex digits.",
+    ),
 ]
 
 
