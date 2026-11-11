@@ -145,7 +145,8 @@ class SessionSetup(StateEVCC):
 
         auth_setup_req = AuthorizationSetupReq(
             header=MessageHeader(
-                session_id=self.comm_session.session_id, timestamp=time.time()
+                session_id=self.comm_session.session_id,
+                timestamp=int(time.time() * 1_000_000),
             )
         )
 
@@ -223,7 +224,7 @@ class AuthorizationSetup(StateEVCC):
                 cert_install_req = CertificateInstallationReq(
                     header=MessageHeader(
                         session_id=self.comm_session.session_id,
-                        timestamp=time.time(),
+                        timestamp=int(time.time() * 1_000_000),
                         signature=signature,
                     ),
                     oem_prov_cert_chain=oem_prov_cert_chain,
@@ -296,7 +297,7 @@ class AuthorizationSetup(StateEVCC):
         auth_req = AuthorizationReq(
             header=MessageHeader(
                 session_id=self.comm_session.session_id,
-                timestamp=time.time(),
+                timestamp=int(time.time() * 1_000_000),
                 signature=signature,
             ),
             selected_auth_service=AuthEnum.PNC if pnc_params else AuthEnum.EIM,
@@ -376,7 +377,7 @@ class Authorization(StateEVCC):
             service_discovery_req = ServiceDiscoveryReq(
                 header=MessageHeader(
                     session_id=self.comm_session.session_id,
-                    timestamp=time.time(),
+                    timestamp=int(time.time() * 1_000_000),
                 )
                 # To limit the list of requested VAS services, set supported_service_ids
             )
@@ -404,7 +405,7 @@ class Authorization(StateEVCC):
             auth_req = AuthorizationReq(
                 header=MessageHeader(
                     session_id=self.comm_session.session_id,
-                    timestamp=time.time(),
+                    timestamp=int(time.time() * 1_000_000),
                     signature=(
                         self.comm_session.authorization_req_message.header.signature
                     ),
@@ -485,7 +486,7 @@ class ServiceDiscovery(StateEVCC):
             session_stop_req = SessionStopReq(
                 header=MessageHeader(
                     session_id=self.comm_session.session_id,
-                    timestamp=time.time(),
+                    timestamp=int(time.time() * 1_000_000),
                 ),
                 charging_session=ChargingSession.TERMINATE,
                 # See "3.5.2. Error handling" in CharIN Implementation Guide for DC BPT
@@ -523,7 +524,7 @@ class ServiceDiscovery(StateEVCC):
         service_detail_req = ServiceDetailReq(
             header=MessageHeader(
                 session_id=self.comm_session.session_id,
-                timestamp=time.time(),
+                timestamp=int(time.time() * 1_000_000),
             ),
             service_id=self.comm_session.service_details_to_request.pop(),
         )
@@ -572,7 +573,7 @@ class ServiceDetail(StateEVCC):
             service_detail_req = ServiceDetailReq(
                 header=MessageHeader(
                     session_id=self.comm_session.session_id,
-                    timestamp=time.time(),
+                    timestamp=int(time.time() * 1_000_000),
                 ),
                 service_id=self.comm_session.service_details_to_request.pop(),
             )
@@ -596,7 +597,7 @@ class ServiceDetail(StateEVCC):
             session_stop_req = SessionStopReq(
                 header=MessageHeader(
                     session_id=self.comm_session.session_id,
-                    timestamp=time.time(),
+                    timestamp=int(time.time() * 1_000_000),
                 ),
                 charging_session=ChargingSession.TERMINATE,
                 ev_termination_explanation="Control mode parameter missing",
@@ -646,7 +647,7 @@ class ServiceDetail(StateEVCC):
         service_selection_req = ServiceSelectionReq(
             header=MessageHeader(
                 session_id=self.comm_session.session_id,
-                timestamp=time.time(),
+                timestamp=int(time.time() * 1_000_000),
             ),
             selected_energy_service=selected_energy_service,
             selected_vas_list=selected_vas_list if selected_vas_list else None,
@@ -731,7 +732,7 @@ class ServiceSelection(StateEVCC):
             next_req = ACChargeParameterDiscoveryReq(
                 header=MessageHeader(
                     session_id=self.comm_session.session_id,
-                    timestamp=time.time(),
+                    timestamp=int(time.time() * 1_000_000),
                 ),
                 ac_params=ac_params,
                 bpt_ac_params=bpt_ac_params,
@@ -764,7 +765,7 @@ class ServiceSelection(StateEVCC):
             next_req = DCChargeParameterDiscoveryReq(
                 header=MessageHeader(
                     session_id=self.comm_session.session_id,
-                    timestamp=time.time(),
+                    timestamp=int(time.time() * 1_000_000),
                 ),
                 dc_params=dc_params,
                 bpt_dc_params=bpt_dc_params,
@@ -862,7 +863,7 @@ class ScheduleExchange(StateEVCC):
                 power_delivery_req = PowerDeliveryReq(
                     header=MessageHeader(
                         session_id=self.comm_session.session_id,
-                        timestamp=time.time(),
+                        timestamp=int(time.time() * 1_000_000),
                     ),
                     ev_processing=ev_processing,
                     charge_progress=charge_progress,
@@ -881,7 +882,7 @@ class ScheduleExchange(StateEVCC):
                 cable_check_req = DCCableCheckReq(
                     header=MessageHeader(
                         session_id=self.comm_session.session_id,
-                        timestamp=time.time(),
+                        timestamp=int(time.time() * 1_000_000),
                     )
                 )
                 self.create_next_message(
@@ -935,7 +936,7 @@ class PowerDelivery(StateEVCC):
                 welding_detection_req = DCWeldingDetectionReq(
                     header=MessageHeader(
                         session_id=self.comm_session.session_id,
-                        timestamp=time.time(),
+                        timestamp=int(time.time() * 1_000_000),
                     ),
                     ev_processing=Processing.ONGOING,
                 )
@@ -950,7 +951,7 @@ class PowerDelivery(StateEVCC):
                 session_stop_req = SessionStopReq(
                     header=MessageHeader(
                         session_id=self.comm_session.session_id,
-                        timestamp=time.time(),
+                        timestamp=int(time.time() * 1_000_000),
                     ),
                     charging_session=self.comm_session.charging_session_stop_v20,
                 )
@@ -1001,7 +1002,7 @@ class PowerDelivery(StateEVCC):
             ac_charge_loop_req = ACChargeLoopReq(
                 header=MessageHeader(
                     session_id=self.comm_session.session_id,
-                    timestamp=time.time(),
+                    timestamp=int(time.time() * 1_000_000),
                 ),
                 display_parameters=await self.comm_session.ev_controller.get_display_params(),  # noqa
                 scheduled_params=scheduled_params,
@@ -1042,7 +1043,7 @@ class PowerDelivery(StateEVCC):
             dc_charge_loop_req = DCChargeLoopReq(
                 header=MessageHeader(
                     session_id=self.comm_session.session_id,
-                    timestamp=time.time(),
+                    timestamp=int(time.time() * 1_000_000),
                 ),
                 display_parameters=await ev_controller.get_display_params(),
                 ev_present_voltage=await ev_controller.get_present_voltage(),
@@ -1104,7 +1105,7 @@ class PowerDelivery(StateEVCC):
         power_delivery_req = PowerDeliveryReq(
             header=MessageHeader(
                 session_id=self.comm_session.session_id,
-                timestamp=time.time(),
+                timestamp=int(time.time() * 1_000_000),
             ),
             ev_processing=ev_processing,
             charge_progress=charge_progress,
@@ -1231,7 +1232,7 @@ class ACChargeParameterDiscovery(StateEVCC):
         return ScheduleExchangeReq(
             header=MessageHeader(
                 session_id=self.comm_session.session_id,
-                timestamp=time.time(),
+                timestamp=int(time.time() * 1_000_000),
             ),
             max_supporting_points=self.comm_session.config.max_supporting_points,
             scheduled_params=scheduled_params,
@@ -1333,7 +1334,7 @@ class ACChargeLoop(StateEVCC):
             ac_charge_loop_req = ACChargeLoopReq(
                 header=MessageHeader(
                     session_id=self.comm_session.session_id,
-                    timestamp=time.time(),
+                    timestamp=int(time.time() * 1_000_000),
                 ),
                 display_parameters=await self.comm_session.ev_controller.get_display_params(),  # noqa
                 scheduled_params=scheduled_params,
@@ -1416,7 +1417,7 @@ class DCChargeParameterDiscovery(StateEVCC):
         return ScheduleExchangeReq(
             header=MessageHeader(
                 session_id=self.comm_session.session_id,
-                timestamp=time.time(),
+                timestamp=int(time.time() * 1_000_000),
             ),
             max_supporting_points=self.comm_session.config.max_supporting_points,
             scheduled_params=scheduled_params,
@@ -1474,7 +1475,7 @@ class DCCableCheck(StateEVCC):
             cable_check_req = DCCableCheckReq(
                 header=MessageHeader(
                     session_id=self.comm_session.session_id,
-                    timestamp=time.time(),
+                    timestamp=int(time.time() * 1_000_000),
                 )
             )
             self.create_next_message(
@@ -1491,7 +1492,7 @@ class DCCableCheck(StateEVCC):
         dc_pre_charge_req = DCPreChargeReq(
             header=MessageHeader(
                 session_id=self.comm_session.session_id,
-                timestamp=time.time(),
+                timestamp=int(time.time() * 1_000_000),
             ),
             ev_processing=processing,
             ev_present_voltage=present_voltage,
@@ -1593,7 +1594,7 @@ class DCPreCharge(StateEVCC):
         power_delivery_req = PowerDeliveryReq(
             header=MessageHeader(
                 session_id=self.comm_session.session_id,
-                timestamp=time.time(),
+                timestamp=int(time.time() * 1_000_000),
             ),
             ev_processing=ev_processing,
             charge_progress=charge_progress,
@@ -1613,7 +1614,7 @@ class DCPreCharge(StateEVCC):
         dc_pre_charge_req = DCPreChargeReq(
             header=MessageHeader(
                 session_id=self.comm_session.session_id,
-                timestamp=time.time(),
+                timestamp=int(time.time() * 1_000_000),
             ),
             ev_processing=processing,
             ev_present_voltage=present_voltage,
@@ -1715,7 +1716,7 @@ class DCChargeLoop(StateEVCC):
         dc_charge_loop_req = DCChargeLoopReq(
             header=MessageHeader(
                 session_id=self.comm_session.session_id,
-                timestamp=time.time(),
+                timestamp=int(time.time() * 1_000_000),
             ),
             display_parameters=await self.comm_session.ev_controller.get_display_params(),  # noqa
             ev_present_voltage=await self.comm_session.ev_controller.get_present_voltage(),  # noqa
@@ -1764,7 +1765,7 @@ class DCWeldingDetection(StateEVCC):
             session_stop_req = SessionStopReq(
                 header=MessageHeader(
                     session_id=self.comm_session.session_id,
-                    timestamp=time.time(),
+                    timestamp=int(time.time() * 1_000_000),
                 ),
                 charging_session=ChargingSession.TERMINATE,
             )
@@ -1781,7 +1782,7 @@ class DCWeldingDetection(StateEVCC):
             next_request = DCWeldingDetectionReq(
                 header=MessageHeader(
                     session_id=self.comm_session.session_id,
-                    timestamp=time.time(),
+                    timestamp=int(time.time() * 1_000_000),
                 ),
                 ev_processing=processing,
             )

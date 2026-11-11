@@ -1177,8 +1177,9 @@ class ChargingStatus(StateEVCC):
                 delay: int = (
                     await self.comm_session.ev_controller.charge_loop_delay()
                 )  # noqa
-                logger.info(f"Next ChargeLoop Req in {delay} seconds")
-                await asyncio.sleep(delay)
+                if delay != 0:
+                    logger.info(f"Next ChargeLoop Req in {delay} seconds")
+                    await asyncio.sleep(delay)
             except Exception as e:
                 logger.info(f"No delay for the next ChargeLoop Req. Reason {e}")
             self.create_next_message(
@@ -1397,8 +1398,9 @@ class CurrentDemand(StateEVCC):
                 delay: int = (
                     await self.comm_session.ev_controller.charge_loop_delay()
                 )  # noqa
-                logger.info(f"Next ChargeLoop Req in {delay} seconds")
-                await asyncio.sleep(delay)
+                if delay != 0:
+                    logger.info(f"Next ChargeLoop Req in {delay} seconds")
+                    await asyncio.sleep(delay)
             except Exception as e:
                 logger.info(f"No delay for the next ChargeLoop Req. Reason {e}")
             current_demand_req = await self.build_current_demand_data()
