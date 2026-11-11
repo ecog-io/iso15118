@@ -73,6 +73,17 @@ class EVCCConfig(BaseModel):
     charge_loop_cycle: Optional[int] = Field(10, alias="chargeLoopCycle")
     # charge loop cycle delay before next cycle
     charge_loop_delay_time: Optional[int] = Field(0, alias="chargeLoopDelay")
+    # Seconds the EVCC waits before re-sending a request the SECC answered with
+    # EVSEProcessing = Ongoing (Authorization, ChargeParameterDiscovery,
+    # CableCheck, ScheduleExchange). The standards set no minimum interval, but
+    # without a pause the EVCC sends thousands of requests per second (measured:
+    # 459,721 AuthorizationReq in 55 s). 0 restores the old back-to-back behaviour.
+    ongoing_retry_delay: float = Field(0.5, alias="ongoingRetryDelay")
+    # Seconds the EVCC waits before re-sending PreChargeReq while the EVSE present
+    # voltage is still outside the EV's acceptance window. PreCharge has no
+    # EVSEProcessing, so ongoing_retry_delay does not apply.
+    # 0 restores the old behaviour.
+    precharge_retry_delay: float = Field(0.1, alias="prechargeRetryDelay")
 
     def load_raw_values(self):
         # conversion of list of strings to enum types.
