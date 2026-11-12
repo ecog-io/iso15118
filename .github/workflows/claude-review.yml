@@ -77,6 +77,16 @@ jobs:
           workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ vars.GCP_VERTEX_SERVICE_ACCOUNT }}
 
+      # caveman (its caveman-review skill) and humanizer write the review comments
+      # (DEVOPS-368). Fetched at a pinned commit, never a branch: caveman runs Node
+      # hooks inside this job, which holds the Vertex token. To upgrade, read the new
+      # release and bump the SHA in every repo.
+      - name: Fetch review plugins (pinned)
+        run: |
+          fetch() { git init -q "$3" && git -C "$3" fetch -q --depth 1 "https://github.com/$1.git" "$2" && git -C "$3" checkout -q FETCH_HEAD; }
+          fetch JuliusBrussee/caveman 1e91f1306d602d4ca23618701b1185575ae1869b "$RUNNER_TEMP/plugins/caveman"  # v4.1.0
+          fetch blader/humanizer b48c832f0f809c1b5658edbb838c2521b72f2413 "$RUNNER_TEMP/plugins/humanizer"  # v4.0.0
+
       - name: Run Claude Code Review
         id: claude-review
         uses: anthropics/claude-code-action@v1
@@ -88,6 +98,12 @@ jobs:
           CLOUD_ML_REGION: ${{ vars.CLOUD_ML_REGION }}
         with:
           use_vertex: "true"
+          plugin_marketplaces: |
+            ${{ runner.temp }}/plugins/caveman
+            ${{ runner.temp }}/plugins/humanizer
+          plugins: |
+            caveman@caveman
+            humanizer@humanizer
           # Consolidates output into one comment per PR instead of a new one each run.
           use_sticky_comment: "true"
           prompt: |
@@ -115,6 +131,9 @@ jobs:
               holds only `N findings (P0: a, P1: b, P2: c).`, plus `K more not posted.` if
               you left any out, plus any finding that has no line to attach to, as one
               line: `[Pn] file — problem → fix`.
+            - Write each comment with the caveman:caveman-review skill (load it first),
+              but keep the [P0] to [P2] tags instead of its emoji prefixes. Then run the
+              text through the humanizer:humanizer skill before you post it.
             - If you find nothing, post exactly: No findings.
 
             Note: the PR branch is already checked out in the working directory.
@@ -126,7 +145,7 @@ jobs:
             it will be discarded.
           claude_args: |
             --model ${{ vars.VERTEX_CLAUDE_MODEL }}
-            --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*)"
+            --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Skill"
 
       # Per-run consumption into the job summary. See the COST note above: this is an
       # estimate, not the Vertex bill.
