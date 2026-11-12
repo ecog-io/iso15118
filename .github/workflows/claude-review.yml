@@ -107,6 +107,14 @@ jobs:
               coverage for changed behaviour, assertions that cannot fail, n+1
               queries, unbounded loops, swallowed errors.
             - No praise. No "looks good otherwise". No summary of what the PR does.
+            - Post at most 5 findings, highest severity first. Do not post [P3] findings.
+            - One inline comment per finding, on the line it concerns. Start it with the
+              tag, then the problem, why it breaks and the fix, in at most three short
+              sentences. No headings, no bold, no restating what the code does.
+            - The top-level comment does not repeat the inline findings. For findings it
+              holds only `N findings (P0: a, P1: b, P2: c).`, plus `K more not posted.` if
+              you left any out, plus any finding that has no line to attach to, as one
+              line: `[Pn] file — problem → fix`.
             - If you find nothing, post exactly: No findings.
 
             Note: the PR branch is already checked out in the working directory.
