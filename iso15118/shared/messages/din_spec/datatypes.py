@@ -274,8 +274,9 @@ class SAScheduleTupleEntry(BaseModel):
     # [V2G-DC-554] In the scope of DIN SPEC 70121, the element
     # “SalesTariff” shall not be used.
 
-    # XSD type unsignedByte with value range [1..255]
-    sa_schedule_tuple_id: int = Field(..., ge=1, le=255, alias="SAScheduleTupleID")
+    # XSD type SAIDType is xs:short without range restriction in DIN SPEC 70121
+    # (ISO 15118-2 restricts it to unsignedByte [1..255]), so 0 is a valid ID
+    sa_schedule_tuple_id: int = Field(..., ge=0, le=32767, alias="SAScheduleTupleID")
     p_max_schedule: PMaxScheduleEntry = Field(..., alias="PMaxSchedule")
     sales_tariff: SalesTariff = Field(None, alias="SalesTariff")
 

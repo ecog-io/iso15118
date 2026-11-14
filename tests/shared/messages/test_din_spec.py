@@ -231,6 +231,35 @@ DIN_TEST_MESSAGES = [
         "PhysicalValuetype in DIN is optional. "
         "In ISO it is mandatory.",
     ),
+    ExiMessageContainer(
+        message_name="ChargeParameterDiscoveryRes",
+        json_str='{"V2G_Message":{"Body":{"ChargeParameterDiscoveryRes":'
+        '{"DC_EVSEChargeParameter":{"DC_EVSEStatus":{"EVSEIsolationStatus":'
+        '"Invalid","EVSENotification":"None","EVSEStatusCode":"EVSE_Ready",'
+        '"NotificationMaxDelay":0},"EVSEMaximumCurrentLimit":{"Multiplier":-1,'
+        '"Unit":"A","Value":4000},"EVSEMaximumPowerLimit":{"Multiplier":2,'
+        '"Unit":"W","Value":2000},"EVSEMaximumVoltageLimit":{"Multiplier":-1,'
+        '"Unit":"V","Value":5000},"EVSEMinimumCurrentLimit":{"Multiplier":-3,'
+        '"Unit":"A","Value":0},"EVSEMinimumVoltageLimit":{"Multiplier":-3,'
+        '"Unit":"V","Value":0},"EVSEPeakCurrentRipple":{"Multiplier":-3,'
+        '"Unit":"A","Value":1000}},"EVSEProcessing":"Finished","ResponseCode":'
+        '"OK","SAScheduleList":{"SAScheduleTuple":[{"PMaxSchedule":'
+        '{"PMaxScheduleEntry":[{"PMax":32767,"RelativeTimeInterval":'
+        '{"duration":86400,"start":0}}],"PMaxScheduleID":0},'
+        '"SAScheduleTupleID":0}]}}},"Header":{"SessionID":"000000000000000B"}}}',
+        description="SAScheduleTupleID 0: the DIN SPEC 70121 XSD defines "
+        "SAIDType as xs:short without a range restriction, unlike "
+        "ISO 15118-2 (unsignedByte 1..255).",
+    ),
+    ExiMessageContainer(
+        message_name="SessionSetupRes",
+        json_str='{"V2G_Message": {"Header": {"SessionID": "AB9AB72CABAEFC72"},"Body":'
+        '{"SessionSetupRes": {"ResponseCode": "OK_NewSessionEstablished",'
+        '"EVSEID": "746573742D636861726765722D65767365", '
+        '"DateTimeNow": 1659025085}}}}',
+        description="EVSEID of 17 bytes (34 hex digits): evseIDType is "
+        "hexBinary with maxLength 32, which counts octets, not hex digits.",
+    ),
 ]
 
 
