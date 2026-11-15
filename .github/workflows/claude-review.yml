@@ -77,7 +77,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           # A comment run starts on the default branch: check out the PR head, with
           # history, since the re-review diffs against the last reviewed commit.
