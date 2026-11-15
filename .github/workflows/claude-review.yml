@@ -17,7 +17,9 @@ name: Claude Code Review
 # One review per pull request, not one per push. The documented example uses
 # [opened, synchronize]; this deliberately does not, because capo sees ~15 PRs a month
 # and the fleet ~420, and per-push review multiplies spend. Re-review on demand by
-# commenting @claude.
+# commenting `@claude review` on the PR: it reviews only the commits since the last
+# review and checks the earlier findings. A comment run always uses the default
+# branch's copy of this file.
 #
 # AUTH: Vertex via Workload Identity Federation, no long-lived key. Proven end to end
 # 2026-08-28. Provider scoped to attribute.repository == 'ecog-gmbh/capo'; the service
@@ -51,6 +53,10 @@ on:
       - '.gitignore'
       - 'LICENSE'
 
+  # A PR comment with `@claude review` is the on-demand re-review (see the job `if:`).
+  issue_comment:
+    types: [created]
+
 permissions:
   contents: read
   pull-requests: write
@@ -61,15 +67,23 @@ jobs:
     # Bots were 18% of PR volume. A dependabot bump paid for a full review nobody
     # reads, cold-cache premium included.
     if: >-
+      (github.event_name == 'pull_request' &&
       github.event.pull_request.draft == false &&
       github.event.pull_request.user.type != 'Bot' &&
-      !startsWith(github.event.pull_request.user.login, 'dependabot')
+      !startsWith(github.event.pull_request.user.login, 'dependabot')) ||
+      (github.event_name == 'issue_comment' && github.event.issue.pull_request &&
+      github.event.comment.user.type != 'Bot' &&
+      contains(github.event.comment.body, '@claude review'))
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 1
+          # A comment run starts on the default branch: check out the PR head, with
+          # history, since the re-review diffs against the last reviewed commit.
+          # '0' is quoted: a bare 0 is falsy in an expression and would give 1.
+          ref: ${{ github.event_name == 'issue_comment' && format('refs/pull/{0}/head', github.event.issue.number) || '' }}
+          fetch-depth: ${{ github.event_name == 'issue_comment' && '0' || '1' }}
 
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v3
@@ -108,14 +122,22 @@ jobs:
           use_sticky_comment: "true"
           prompt: |
             REPO: ${{ github.repository }}
-            PR NUMBER: ${{ github.event.pull_request.number }}
+            PR NUMBER: ${{ github.event.pull_request.number || github.event.issue.number }}
 
             Review this pull request against the EcoG review standard
             (claude-code-setup/claude.md/strict-reviewer):
 
-            - Tag every finding [P0] to [P3]. [P0] blocks merge, something breaks in
-              production. [P1] fix before merge. [P2] follow-up tech debt. [P3] note
-              or preference.
+            - Tag every finding [P0] to [P3]. [P0]: code that ships breaks production,
+              loses data or opens a security hole, and you can say how. [P1] fix
+              before merge. [P2] follow-up tech debt. [P3] note or preference.
+              Missing tests, style and hypothetical edge cases are never [P0]. When
+              unsure between two levels, pick the lower one.
+            - Calibration from past EcoG reviews. [P0]: an upload endpoint without
+              auth that unzips as root without path checks (Zip Slip); a new
+              mandatory config key that configs already on chargers lack, so the
+              service fails to start. [P1]: errorCodes sent outside the OCPP 1.6
+              enum. Not [P0]: a service that fails only after a manual SD-card
+              reformat ([P2]); "sleep(usleep()) could hang for 136 years" (no bug).
             - Security findings are always [P0] or [P1]. No exceptions.
             - Always check: injection vectors, missing auth checks, unvalidated input,
               hardcoded secrets, error messages leaking internals, off-by-one, wrong
@@ -134,6 +156,19 @@ jobs:
             - Write each comment with the caveman:caveman-review skill (load it first),
               but keep the [P0] to [P2] tags instead of its emoji prefixes. Then run the
               text through the humanizer:humanizer skill before you post it.
+            - End each inline comment with the line:
+              Reply `@claude fix` to have Claude push this fix.
+            - End the top-level comment with the line `Reviewed at <sha>.`, where
+              <sha> is the PR head commit (`gh pr view ${{ github.event.pull_request.number || github.event.issue.number }} --json headRefOid`).
+            - This run was started by: ${{ github.event_name }}. If that is
+              issue_comment (someone asked for `@claude review`) and an earlier
+              comment of yours says "Reviewed at <sha>", this is a re-review.
+              Use the newest such <sha>. Review only `git diff <sha> HEAD`,
+              skipping changes merged in from the base branch. Read your earlier
+              inline findings with `gh api repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number || github.event.issue.number }}/comments`
+              and never post one again. Post a new top-level comment: the count
+              line for new findings, then each earlier finding as one line marked
+              fixed or still open, then the Reviewed at line.
             - If you find nothing, post exactly: No findings.
 
             Note: the PR branch is already checked out in the working directory.
@@ -145,7 +180,7 @@ jobs:
             it will be discarded.
           claude_args: |
             --model ${{ vars.VERTEX_CLAUDE_MODEL }}
-            --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Skill"
+            --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Skill,Bash(git diff:*),Bash(gh api repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number || github.event.issue.number }}/comments:*)"
 
       # Per-run consumption into the job summary. See the COST note above: this is an
       # estimate, not the Vertex bill.
