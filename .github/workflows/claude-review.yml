@@ -77,7 +77,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
         with:
           # A comment run starts on the default branch: check out the PR head, with
           # history, since the re-review diffs against the last reviewed commit.
@@ -86,7 +86,7 @@ jobs:
           fetch-depth: ${{ github.event_name == 'issue_comment' && '0' || '1' }}
 
       - name: Authenticate to Google Cloud
-        uses: google-github-actions/auth@v3
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093  # v3.0.0
         with:
           workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ vars.GCP_VERTEX_SERVICE_ACCOUNT }}
@@ -101,9 +101,30 @@ jobs:
           fetch JuliusBrussee/caveman 1e91f1306d602d4ca23618701b1185575ae1869b "$RUNNER_TEMP/plugins/caveman"  # v4.1.0
           fetch blader/humanizer b48c832f0f809c1b5658edbb838c2521b72f2413 "$RUNNER_TEMP/plugins/humanizer"  # v4.0.0
 
+      # resolve-finding PR COMMENT_ID: resolves the review thread that starts with that
+      # inline comment, only if claude wrote it and it is unresolved. The re-review calls
+      # it for each fixed finding; numeric arguments only.
+      - name: Thread resolver for the re-review
+        run: |
+          cat > "$RUNNER_TEMP/resolve-finding" <<'SH'
+          #!/usr/bin/env bash
+          set -euo pipefail
+          [[ "${1:-}" =~ ^[0-9]+$ && "${2:-}" =~ ^[0-9]+$ ]] || { echo "usage: resolve-finding PR COMMENT_ID" >&2; exit 2; }
+          # shellcheck disable=SC2016
+          tid=$(gh api graphql -f o="${GITHUB_REPOSITORY%/*}" -f r="${GITHUB_REPOSITORY#*/}" -F n="$1" -f query='
+            query($o: String!, $r: String!, $n: Int!) { repository(owner: $o, name: $r) { pullRequest(number: $n) {
+              reviewThreads(first: 100) { nodes { id isResolved comments(first: 1) { nodes { databaseId author { login } } } } } } } }' \
+            --jq ".data.repository.pullRequest.reviewThreads.nodes[] | select((.isResolved | not) and .comments.nodes[0].databaseId == $2 and .comments.nodes[0].author.login == \"claude\") | .id")
+          [ -n "$tid" ] || { echo "No unresolved claude thread starts with comment $2."; exit 0; }
+          # shellcheck disable=SC2016
+          gh api graphql -f t="$tid" -f query='mutation($t: ID!) { resolveReviewThread(input: {threadId: $t}) { thread { isResolved } } }' --silent
+          echo "Resolved the thread of finding $2."
+          SH
+          chmod +x "$RUNNER_TEMP/resolve-finding"
+
       - name: Run Claude Code Review
         id: claude-review
-        uses: anthropics/claude-code-action@v1
+        uses: anthropics/claude-code-action@f3b070c88125d33dbae5653df5f143101d4ea9dc  # v1.0.276
         env:
           # google-github-actions/auth exports GOOGLE_APPLICATION_CREDENTIALS, which
           # takes precedence over ANTHROPIC_VERTEX_PROJECT_ID. Both set so the project
@@ -168,7 +189,10 @@ jobs:
               inline findings with `gh api repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number || github.event.issue.number }}/comments`
               and never post one again. Post a new top-level comment: the count
               line for new findings, then each earlier finding as one line marked
-              fixed or still open, then the Reviewed at line.
+              fixed or still open, then the Reviewed at line. For each earlier
+              finding that is fixed, run
+              `${{ runner.temp }}/resolve-finding <PR NUMBER> <its comment id>`
+              (the id from that gh api output) to resolve its thread.
             - If you find nothing, post exactly: No findings.
 
             Note: the PR branch is already checked out in the working directory.
@@ -180,7 +204,7 @@ jobs:
             it will be discarded.
           claude_args: |
             --model ${{ vars.VERTEX_CLAUDE_MODEL }}
-            --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Skill,Bash(git diff:*),Bash(gh api repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number || github.event.issue.number }}/comments:*)"
+            --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Skill,Bash(git diff:*),Bash(gh api repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number || github.event.issue.number }}/comments:*),Bash(${{ runner.temp }}/resolve-finding:*)"
 
       # Per-run consumption into the job summary. See the COST note above: this is an
       # estimate, not the Vertex bill.
